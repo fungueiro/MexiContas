@@ -100,8 +100,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .prog-meta{font-size:11px;color:var(--text2);margin-top:3px}
 .prog-importe{font-size:17px;font-weight:600;color:var(--red-d);white-space:nowrap}
 .prog-actions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
-.icon-btn{border:none;background:transparent;cursor:pointer;color:var(--text2);padding:3px 5px;border-radius:5px;font-size:14px;transition:all .15s}
+.icon-btn{border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text2);padding:5px 9px;border-radius:7px;font-size:13px;transition:all .15s;display:inline-flex;align-items:center;gap:4px;font-family:inherit;font-weight:500}
 .icon-btn:hover{color:var(--text);background:var(--surface2)}
+button.icon-btn.btn-danger{color:var(--red-d);border-color:#F09595;background:transparent}
+button.icon-btn.btn-danger:hover{background:var(--red-l)}
 .msg-ok{font-size:13px;color:var(--green-d);display:none;margin-top:10px}
 .table-wrap{overflow-x:auto}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-d);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:200;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px;opacity:0;transition:all .3s;pointer-events:none}
@@ -128,17 +130,22 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-o
 .ac-item:hover,.ac-item.sel{background:var(--surface2)}
 /* Tarjetas móvil para movimientos */
 .mov-cards{display:none}
-@media(max-width:680px){
+@media(max-width:768px){
   .table-wrap table{display:none}
   .mov-cards{display:block}
   .nav-tabs .tab span{display:none}
+  .nav-tabs .tab{padding:8px 10px}
+  .filters{gap:5px}
+  .filters input[type=text]{width:120px}
+  .content{padding:12px}
 }
 .mcard{border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:9px;background:var(--surface);box-shadow:var(--shadow)}
 .mcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
 .mcard-prov{font-size:14px;font-weight:600}
 .mcard-imp{font-size:16px;font-weight:700;white-space:nowrap}
 .mcard-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--text2)}
-.mcard-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
+.mcard-actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+.mcard-actions .icon-btn{padding:8px 14px;font-size:12px;font-weight:600;min-height:36px}
 .toggle-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:10px}
 .switch{position:relative;width:38px;height:21px;flex-shrink:0}
 .switch input{opacity:0;width:0;height:0}
@@ -804,7 +811,7 @@ function renderTabla(){
     <td><span class="badge bc" style="font-size:10px">${esc(m.cat)}</span></td>
     <td style="text-align:right;font-weight:600;${m.tipo==='Ingreso'?'color:var(--green-d)':''};white-space:nowrap">${m.tipo==='Gasto'?'-':''}${eur(m.importe)} €</td>
     <td style="color:var(--text2);font-size:11px">${esc(m.pago)}</td>
-    <td style="text-align:center;white-space:nowrap"><button class="icon-btn" onclick="editMov(${m.id})" title="Editar"><i class="ti ti-edit"></i></button><button class="icon-btn btn-danger" onclick="delMov(${m.id})" title="Eliminar"><i class="ti ti-trash"></i></button></td>
+    <td style="text-align:right;white-space:nowrap"><button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button> <button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></td>
   </tr>`).join('');
 
   document.getElementById('movCards').innerHTML=pageItems.map(m=>`<div class="mcard">
@@ -999,9 +1006,9 @@ function guardarMov(){
 
 /* ---------- CATEGORIAS ---------- */
 function renderCats(){
-  const fila=(c,tipo)=>`<div class="cat-row"><span class="cat-name">${esc(c)}</span><span style="display:flex;gap:5px">
-    <button class="icon-btn" onclick="editCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>
-    <button class="icon-btn btn-danger" onclick="delCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></span></div>`;
+  const fila=(c,tipo)=>`<div class="cat-row"><span class="cat-name">${esc(c)}</span><span style="display:flex;gap:6px">
+    <button class="icon-btn" onclick="editCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i> Renombrar</button>
+    <button class="icon-btn btn-danger" onclick="delCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i> Borrar</button></span></div>`;
   document.getElementById('listaCatGasto').innerHTML=CATS_GASTO.map(c=>fila(c,'gasto')).join('')||'<p style="font-size:12px;color:var(--text2)">Sin categorías.</p>';
   document.getElementById('listaCatIngreso').innerHTML=CATS_INGRESO.map(c=>fila(c,'ingreso')).join('')||'<p style="font-size:12px;color:var(--text2)">Sin categorías.</p>';
 }

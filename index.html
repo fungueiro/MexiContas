@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1D9E75">
+<title>MexiContas — Ingresos y gastos</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%231D9E75' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='8.5' width='25' height='4.5' rx='1'/%3E%3Cline x1='9.5' y1='8.5' x2='9.5' y2='13'/%3E%3Cline x1='16' y1='8.5' x2='16' y2='13'/%3E%3Cline x1='22.5' y1='8.5' x2='22.5' y2='13'/%3E%3Cline x1='7' y1='13' x2='7' y2='25'/%3E%3Cline x1='12.5' y1='13' x2='12.5' y2='27'/%3E%3Cline x1='19' y1='13' x2='19' y2='24.5'/%3E%3Cline x1='25' y1='13' x2='25' y2='26'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f4f3ee; --surface:#ffffff; --surface2:#faf9f5; --border:#e3e1d8;
+  --text:#2c2c2a; --text2:#6b6a64; --text3:#9b9a93;
+  --green:#1D9E75; --green-d:#0F6E56; --green-l:#E1F5EE;
+  --red:#E24B4A; --red-d:#A32D2D; --red-l:#FCEBEB;
+  --blue:#378ADD; --blue-d:#185FA5;
+  --amber:#EF9F27; --amber-d:#854F0B; --amber-l:#FAEEDA;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-lg:0 10px 30px rgba(0,0,0,.12);
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1a1a18;--surface:#242422;--surface2:#2c2c2a;--border:#3a3a37;
+  --text:#f0efe8;--text2:#a8a79f;--text3:#76756e;
+  --green-l:#0a3a2c;--red-l:#3a1414;--amber-l:#3a2a0a;
+  --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 10px 30px rgba(0,0,0,.5);}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10;flex-wrap:wrap;gap:8px}
+.nav-logo{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;color:var(--text)}
+.nav-right{display:flex;align-items:center;gap:10px}
+.sync-dot{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.sync-dot i{font-size:14px}
+.sync-on{color:var(--green-d)} .sync-off{color:var(--text3)} .sync-sync{color:var(--blue-d)}
+.nav-tabs{display:flex;gap:3px;flex-wrap:wrap}
+.tab{padding:7px 13px;border-radius:8px;font-size:13px;cursor:pointer;border:none;background:transparent;color:var(--text2);display:flex;align-items:center;gap:5px;transition:background .15s}
+.tab.active{background:var(--surface2);color:var(--text);font-weight:600}
+.tab:hover:not(.active){background:var(--surface2)}
+.content{padding:18px;max-width:1100px;margin:0 auto}
+.section{display:none;animation:fade .25s ease}
+.section.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.metric{background:var(--surface2);border-radius:10px;padding:13px 15px;box-shadow:var(--shadow)}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:4px}
+.metric-value{font-size:21px;font-weight:600}
+.green{color:var(--green-d)} .red{color:var(--red-d)} .blue{color:var(--blue-d)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+@media(max-width:720px){.charts-grid{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:15px;box-shadow:var(--shadow)}
+.card-title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em}
+.full-card{grid-column:1/-1}
+table{width:100%;font-size:12px;border-collapse:collapse}
+thead th{position:sticky;top:0;background:var(--surface);z-index:1}
+th{text-align:left;padding:8px 10px;color:var(--text2);font-weight:600;border-bottom:1px solid var(--border);font-size:11px;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:nth-child(even) td{background:var(--surface2)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:10px;font-weight:600;white-space:nowrap}
+.bi{background:var(--green-l);color:var(--green-d)}
+.bg{background:var(--red-l);color:var(--red-d)}
+.bc{background:var(--surface2);color:var(--text2)}
+.filters{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+select,input,textarea{font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--green);outline-offset:-1px}
+.filters input[type=text]{width:150px}
+.filters .flabel{font-size:11px;color:var(--text2);font-weight:600;margin-left:4px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px;font-size:11px;color:var(--text2)}
+.legend span{display:flex;align-items:center;gap:4px}
+.ldot{width:9px;height:9px;border-radius:2px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:11px;color:var(--text2);font-weight:600}
+.fg-full{grid-column:1/-1}
+.btn{padding:8px 15px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--text);font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:all .15s}
+.btn:hover{background:var(--surface2)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-primary:hover{background:var(--green-d)}
+.btn-danger{background:transparent;color:var(--red-d);border-color:#F09595}
+.btn-danger:hover{background:var(--red-l)}
+.btn-row{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.saldo-pos{color:var(--green-d);font-weight:600}
+.saldo-neg{color:var(--red-d);font-weight:600}
+.alert-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:600;background:var(--amber-l);color:var(--amber-d)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;animation:fade .15s}
+.modal{background:var(--surface);border-radius:14px;padding:20px;width:520px;max-width:100%;border:1px solid var(--border);max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:pop .2s}
+@keyframes pop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:14px}
+.modal-msg{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px}
+.prog-card{border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:10px;background:var(--surface);box-shadow:var(--shadow)}
+.prog-card.alerta{border-color:var(--amber);background:var(--amber-l)}
+.prog-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:10px}
+.prog-nombre{font-size:14px;font-weight:600}
+.prog-meta{font-size:11px;color:var(--text2);margin-top:3px}
+.prog-importe{font-size:17px;font-weight:600;color:var(--red-d);white-space:nowrap}
+.prog-actions{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.icon-btn{border:none;background:transparent;cursor:pointer;color:var(--text2);padding:3px 5px;border-radius:5px;font-size:14px;transition:all .15s}
+.icon-btn:hover{color:var(--text);background:var(--surface2)}
+.msg-ok{font-size:13px;color:var(--green-d);display:none;margin-top:10px}
+.table-wrap{overflow-x:auto}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green-d);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:200;box-shadow:var(--shadow-lg);display:flex;align-items:center;gap:8px;opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.toast.err{background:var(--red-d)}
+.footer{text-align:center;padding:20px;font-size:11px;color:var(--text3)}
+.aviso-nuevo{background:var(--amber-l);border:1px solid var(--amber);border-radius:10px;padding:11px 14px;margin-bottom:9px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cat-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px;background:var(--surface)}
+.cat-name{font-size:13px;font-weight:600}
+.lock{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;align-items:center;justify-content:center;padding:18px}
+.lock-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:30px 26px;width:340px;max-width:100%;text-align:center;box-shadow:var(--shadow-lg)}
+.lock-logo{display:flex;align-items:center;justify-content:center;gap:8px;font-size:20px;font-weight:700;margin-bottom:18px}
+.lock-msg{font-size:14px;color:var(--text2);margin-bottom:16px}
+.pin-input{width:100%;text-align:center;font-size:26px;letter-spacing:14px;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);margin-bottom:12px}
+.pin-err{font-size:12px;color:var(--red-d);min-height:16px;margin-bottom:10px}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+.spinner-dark{border-color:var(--border);border-top-color:var(--green)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overlay-load{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#fff;font-size:13px}
+.overlay-load.show{display:flex}
+.autocomplete-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:2px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:var(--shadow-lg);display:none}
+.ac-item{padding:7px 10px;font-size:13px;cursor:pointer}
+.ac-item:hover,.ac-item.sel{background:var(--surface2)}
+/* Tarjetas móvil para movimientos */
+.mov-cards{display:none}
+@media(max-width:680px){
+  .table-wrap table{display:none}
+  .mov-cards{display:block}
+  .nav-tabs .tab span{display:none}
+}
+.mcard{border:1px solid var(--border);border-radius:11px;padding:12px;margin-bottom:9px;background:var(--surface);box-shadow:var(--shadow)}
+.mcard-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.mcard-prov{font-size:14px;font-weight:600}
+.mcard-imp{font-size:16px;font-weight:700;white-space:nowrap}
+.mcard-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--text2)}
+.mcard-actions{display:flex;gap:8px;margin-top:8px;justify-content:flex-end}
+.toggle-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);margin-bottom:10px}
+.switch{position:relative;width:38px;height:21px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:var(--border);border-radius:21px;cursor:pointer;transition:.2s}
+.slider:before{content:"";position:absolute;width:15px;height:15px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider{background:var(--green)}
+.switch input:checked+.slider:before{transform:translateX(17px)}
+.pagination{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--text2)}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA DE BLOQUEO -->
+<div class="lock" id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-logo">
+      <svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="#1D9E75" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8.5" width="25" height="4.5" rx="1"/><line x1="9.5" y1="8.5" x2="9.5" y2="13"/><line x1="16" y1="8.5" x2="16" y2="13"/><line x1="22.5" y1="8.5" x2="22.5" y2="13"/><line x1="7" y1="13" x2="7" y2="25"/><line x1="12.5" y1="13" x2="12.5" y2="27"/><line x1="19" y1="13" x2="19" y2="24.5"/><line x1="25" y1="13" x2="25" y2="26"/></svg>
+      MexiContas
+    </div>
+    <div class="lock-msg" id="lockMsg">Introduce tu PIN</div>
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····">
+    <div class="pin-err" id="pinErr"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" id="pinBtn" onclick="accionPin()">Entrar</button>
+  </div>
+</div>
+
+<div id="modalContainer"></div>
+<div class="toast" id="toast"></div>
+<div class="overlay-load" id="overlayLoad"><div class="spinner"></div><span id="overlayTxt">Procesando…</span></div>
+
+<div class="nav">
+  <div class="nav-logo">
+    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" stroke="#1D9E75" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3.5" y="8.5" width="25" height="4.5" rx="1"/><line x1="9.5" y1="8.5" x2="9.5" y2="13"/><line x1="16" y1="8.5" x2="16" y2="13"/><line x1="22.5" y1="8.5" x2="22.5" y2="13"/><line x1="7" y1="13" x2="7" y2="25"/><line x1="12.5" y1="13" x2="12.5" y2="27"/><line x1="19" y1="13" x2="19" y2="24.5"/><line x1="25" y1="13" x2="25" y2="26"/></svg>
+    MexiContas
+  </div>
+  <div class="nav-right">
+    <div class="sync-dot" id="syncDot" title="Estado de sincronización"><i class="ti ti-cloud-off"></i><span id="syncTxt">Local</span></div>
+  </div>
+  <div class="nav-tabs">
+    <button class="tab active" data-sec="resumen"><i class="ti ti-chart-pie"></i> <span>Resumen</span></button>
+    <button class="tab" data-sec="movimientos"><i class="ti ti-list"></i> <span>Movimientos</span></button>
+    <button class="tab" data-sec="programados"><i class="ti ti-calendar-repeat"></i> <span>Programados</span></button>
+    <button class="tab" data-sec="nuevo"><i class="ti ti-plus"></i> <span>Nuevo</span></button>
+    <button class="tab" data-sec="categorias"><i class="ti ti-tag"></i> <span>Categorías</span></button>
+    <button class="tab" data-sec="datos"><i class="ti ti-database"></i> <span>Datos</span></button>
+  </div>
+</div>
+
+<div class="content">
+
+<!-- RESUMEN -->
+<div class="section active" id="sec-resumen">
+  <div class="filters">
+    <span class="flabel">Desde</span><input type="date" id="rDesde" onchange="buildCharts()">
+    <span class="flabel">Hasta</span><input type="date" id="rHasta" onchange="buildCharts()">
+    <button class="btn" onclick="limpiarResumen()"><i class="ti ti-x"></i> Quitar fechas</button>
+    <button class="btn btn-primary" onclick="descargarResumen()"><i class="ti ti-download"></i> Descargar informe</button>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="metric-label"><i class="ti ti-trending-up"></i> Ingresos</div><div class="metric-value green" id="mIng" data-eur="0">0 €</div></div>
+    <div class="metric"><div class="metric-label"><i class="ti ti-trending-down"></i> Gastos</div><div class="metric-value red" id="mGas" data-eur="0">0 €</div></div>
+    <div class="metric"><div class="metric-label"><i class="ti ti-calculator"></i> Resultado</div><div class="metric-value blue" id="mRes" data-eur="0">0 €</div></div>
+    <div class="metric"><div class="metric-label"><i class="ti ti-receipt"></i> Movimientos</div><div class="metric-value" id="mNum">0</div></div>
+  </div>
+  <div class="charts-grid">
+    <div class="card">
+      <div class="card-title">Gastos vs ingresos por mes</div>
+      <div class="legend"><span><span class="ldot" style="background:#E24B4A"></span>Gastos</span><span><span class="ldot" style="background:#1D9E75"></span>Ingresos</span></div>
+      <div style="position:relative;height:210px"><canvas id="chartMes"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Gastos por categoría</div>
+      <div style="position:relative;height:230px"><canvas id="chartCat"></canvas></div>
+    </div>
+    <div class="card full-card">
+      <div class="card-title">Resultado mensual</div>
+      <div style="position:relative;height:170px"><canvas id="chartBal"></canvas></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Desglose por categoría de gasto</div>
+    <table><thead><tr><th>Categoría</th><th style="text-align:right">Total €</th><th style="text-align:right">%</th></tr></thead><tbody id="catTable"></tbody></table>
+  </div>
+</div>
+
+<!-- MOVIMIENTOS -->
+<div class="section" id="sec-movimientos">
+  <div class="filters">
+    <select id="fTipo"><option value="">Todos</option><option value="Ingreso">Ingresos</option><option value="Gasto">Gastos</option></select>
+    <select id="fCat"><option value="">Todas las categorías</option></select>
+    <span class="flabel">Desde</span><input type="date" id="fDesde">
+    <span class="flabel">Hasta</span><input type="date" id="fHasta">
+    <input type="text" id="fTxt" placeholder="Buscar proveedor, desc, categoría...">
+    <button class="btn" onclick="limpiarFiltros()"><i class="ti ti-filter-off"></i> Limpiar filtro</button>
+    <button class="btn btn-primary" onclick="descargarMovFiltrados()"><i class="ti ti-download"></i> Descargar resultado</button>
+  </div>
+  <div class="card">
+    <div class="table-wrap">
+      <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Proveedor</th><th>Categoría</th><th style="text-align:right">Importe €</th><th>Pago</th><th style="text-align:center">Acciones</th></tr></thead><tbody id="movTabla"></tbody></table>
+    </div>
+    <div class="mov-cards" id="movCards"></div>
+    <div class="pagination" id="movPag"></div>
+    <div id="movCount" style="padding:9px 10px;font-size:12px;color:var(--text2)"></div>
+  </div>
+</div>
+
+<!-- PROGRAMADOS -->
+<div class="section" id="sec-programados">
+  <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Aquí gestionas los gastos recurrentes. Los avisos de vencimiento aparecen también en la pestaña <strong>Nuevo</strong> para que los cargues desde allí.</p>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+    <label class="toggle-row" style="margin:0"><span class="switch"><input type="checkbox" id="soloPend" onchange="renderProg()"><span class="slider"></span></span> Ver solo pendientes este mes</label>
+    <button class="btn btn-primary" onclick="abrirModalProg()"><i class="ti ti-plus"></i> Añadir gasto programado</button>
+  </div>
+  <div id="listaProg"></div>
+</div>
+
+<!-- NUEVO -->
+<div class="section" id="sec-nuevo">
+  <div id="avisosNuevo" style="max-width:580px;margin:0 auto 12px auto"></div>
+  <div class="card" style="max-width:580px;margin:0 auto">
+    <div class="card-title" style="margin-bottom:14px">Registrar movimiento</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Tipo</label><select id="nTipo"><option value="Gasto">Gasto</option><option value="Ingreso">Ingreso</option></select></div>
+      <div class="form-group"><label>Fecha</label><input type="date" id="nFecha"></div>
+      <div class="form-group fg-full"><label>Proveedor / cliente</label><div class="autocomplete-wrap"><input type="text" id="nProv" maxlength="80" placeholder="Ej: Dyscatoil, Venta mejillón..." autocomplete="off"><div class="ac-list" id="acProv"></div></div></div>
+      <div class="form-group fg-full"><label>Descripción</label><input type="text" id="nDesc" maxlength="120" placeholder="Detalle"></div>
+      <div class="form-group"><label>Categoría</label><select id="nCat"></select></div>
+      <div class="form-group"><label>Importe (€)</label><input type="number" id="nImp" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Método de pago</label><select id="nPago"><option>tarjeta</option><option>efectivo</option><option>transferencia</option></select></div>
+      <div class="form-group"><label>¿Factura?</label><select id="nFac"><option>no</option><option>si</option></select></div>
+    </div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="guardarMov()"><i class="ti ti-check"></i> Guardar</button></div>
+    <div id="msgOk" class="msg-ok"><i class="ti ti-circle-check"></i> Guardado correctamente.</div>
+  </div>
+</div>
+
+<!-- CATEGORIAS -->
+<div class="section" id="sec-categorias">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary" onclick="abrirModalCat()"><i class="ti ti-plus"></i> Nueva categoría</button>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-title">Categorías de gasto</div>
+    <div id="listaCatGasto"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Categorías de ingreso</div>
+    <div id="listaCatIngreso"></div>
+  </div>
+</div>
+
+<!-- DATOS -->
+<div class="section" id="sec-datos">
+  <div class="card" style="max-width:580px;margin:0 auto">
+    <div class="card-title" style="margin-bottom:14px">Sincronización en la nube</div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Conecta tus datos a la nube (Supabase) para no perderlos si cambias de dispositivo o borras el navegador. Usa un código de sincronización para acceder a los mismos datos desde cualquier sitio.</p>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <div class="form-group"><label>Código de sincronización (tu cuenta)</label><input type="text" id="syncCode" placeholder="ej: mexillon-2026" maxlength="40"></div>
+      <button class="btn btn-primary" style="justify-content:center" onclick="activarSync()"><i class="ti ti-cloud-upload"></i> Activar sincronización en la nube</button>
+      <button class="btn" style="justify-content:center" onclick="desactivarSync()"><i class="ti ti-cloud-off"></i> Trabajar solo en local</button>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">Usa el mismo código en otro dispositivo para ver tus datos. Manténlo privado: quien lo conozca puede ver tus cuentas.</p>
+  </div>
+
+  <div class="card" style="max-width:580px;margin:14px auto">
+    <div class="card-title" style="margin-bottom:14px">Gestión de datos</div>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Tus datos se guardan automáticamente en este navegador. Puedes importarlos/exportarlos en Excel o CSV, o reiniciar a los datos originales.</p>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <label class="btn" style="justify-content:center" for="fileImport"><i class="ti ti-upload"></i> Importar desde Excel o CSV</label>
+      <input type="file" id="fileImport" accept=".csv,.xlsx,.xls" style="display:none" onchange="importarArchivo(event)">
+      <button class="btn" onclick="exportarExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar todo a Excel (.xlsx)</button>
+      <button class="btn" onclick="exportarTodoCSV()"><i class="ti ti-download"></i> Exportar todo a CSV</button>
+      <button class="btn btn-danger" onclick="resetDatos()"><i class="ti ti-refresh"></i> Reiniciar a datos originales</button>
+    </div>
+    <div class="card-title" style="margin:20px 0 12px">Seguridad</div>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <label class="toggle-row" style="margin:0;justify-content:space-between"><span>Auto-bloqueo tras 5 min de inactividad</span><span class="switch"><input type="checkbox" id="autoLock" onchange="toggleAutoLock()"><span class="slider"></span></span></label>
+      <label class="toggle-row" style="margin:0;justify-content:space-between"><span>Avisos de vencimiento del navegador</span><span class="switch"><input type="checkbox" id="notifPerm" onchange="toggleNotif()"><span class="slider"></span></span></label>
+      <button class="btn" onclick="cambiarPin()"><i class="ti ti-lock"></i> Cambiar PIN</button>
+      <button class="btn" onclick="quitarPin()"><i class="ti ti-lock-open"></i> Quitar PIN</button>
+      <button class="btn" onclick="bloquearAhora()"><i class="ti ti-lock"></i> Bloquear ahora</button>
+    </div>
+    <p style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">El PIN se guarda cifrado (hash) en este navegador. <span title="Si lo olvidas tendrás que borrar los datos del navegador para entrar." style="text-decoration:underline dotted;cursor:help">¿Olvidaste el PIN?</span></p>
+    <div class="card-title" style="margin:20px 0 12px">Auditoría reciente</div>
+    <div id="auditLog" style="font-size:11px;color:var(--text2);line-height:1.8;max-height:160px;overflow-y:auto"></div>
+    <p id="estadoGuardado" style="font-size:11px;color:var(--text3);margin-top:14px"></p>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">MexiContas · App de gestión de ingresos y gastos</div>
+
+<script>
+const DIAS_AVISO=5;
+const SB_URL='https://cfqlattwvyvtakkyznpb.supabase.co';
+const SB_KEY='sb_publishable_oL4fvXIZd6bn76MqqX6l5Q_0FDcv8X8';
+const CATS_GASTO_DEF=['combustible coche','vehículo (seguros, peajes, reparaciones)','combustible barco','mantenimiento barco','suministros explotación','galpón (alquiler, suministros)','gestoría / asesoría','seguridad social','sueldos y nóminas','créditos y financieros','seguros','impuestos','asociaciones (Aspromeri)','dietas y comidas','otros'];
+const CATS_INGRESO_DEF=['Mejillón','Servicios a terceros'];
+let CATS_GASTO=[...CATS_GASTO_DEF], CATS_INGRESO=[...CATS_INGRESO_DEF], CATS=[...CATS_GASTO,...CATS_INGRESO];
+function recomputarCats(){CATS=[...CATS_GASTO,...CATS_INGRESO];}
+function catsDe(tipo){return tipo==='Ingreso'?CATS_INGRESO:CATS_GASTO;}
+function poblarCat(sel,tipo,selected){sel.innerHTML=catsDe(tipo).map(c=>`<option value="${esc(c)}"${c===selected?' selected':''}>${esc(c)}</option>`).join('');}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+const ORIGINAL=[
+{id:1,fecha:'4/01/2026',tipo:'Gasto',proveedor:'Gasolinera Eroski',cat:'combustible coche',desc:'Gasoil',importe:74,pago:'tarjeta',factura:'no'},
+{id:2,fecha:'7/01/2026',tipo:'Gasto',proveedor:'Comida',cat:'dietas y comidas',desc:'Comida ir apañar cría',importe:60,pago:'tarjeta',factura:'no'},
+{id:3,fecha:'7/01/2026',tipo:'Gasto',proveedor:'Moeve',cat:'combustible coche',desc:'Gasoil coche',importe:90.01,pago:'tarjeta',factura:'no'},
+{id:4,fecha:'8/01/2026',tipo:'Gasto',proveedor:'E. Varela e hijos',cat:'suministros explotación',desc:'Hipoclorito',importe:21.5,pago:'efectivo',factura:'no'},
+{id:5,fecha:'8/01/2026',tipo:'Gasto',proveedor:'Restaurante',cat:'dietas y comidas',desc:'Comida ir apañar cría',importe:80.8,pago:'tarjeta',factura:'no'},
+{id:6,fecha:'12/01/2026',tipo:'Gasto',proveedor:'Varela e hijos',cat:'mantenimiento barco',desc:'Teflón, lanza dispersor',importe:33.8,pago:'tarjeta',factura:'no'},
+{id:7,fecha:'14/01/2026',tipo:'Gasto',proveedor:'SEVIMAR ONLINE',cat:'suministros explotación',desc:'Raspetas, guantes',importe:32.36,pago:'efectivo',factura:'no'},
+{id:8,fecha:'14/01/2026',tipo:'Gasto',proveedor:'Grupo Día',cat:'otros',desc:'Jabón, comida',importe:6.89,pago:'efectivo',factura:'no'},
+{id:9,fecha:'14/01/2026',tipo:'Gasto',proveedor:'BP Taragoña',cat:'combustible coche',desc:'Gasoil',importe:88.68,pago:'tarjeta',factura:'no'},
+{id:10,fecha:'15/01/2026',tipo:'Gasto',proveedor:'Portos de Galicia',cat:'galpón (alquiler, suministros)',desc:'Alquiler galpón',importe:479.55,pago:'transferencia',factura:'si'},
+{id:11,fecha:'15/01/2026',tipo:'Gasto',proveedor:'Portos de Galicia',cat:'galpón (alquiler, suministros)',desc:'Agua galpón',importe:53.87,pago:'transferencia',factura:'si'},
+{id:12,fecha:'15/01/2026',tipo:'Gasto',proveedor:'Portos de Galicia',cat:'galpón (alquiler, suministros)',desc:'Electricidad galpón',importe:193.9,pago:'transferencia',factura:'si'},
+{id:13,fecha:'15/01/2026',tipo:'Gasto',proveedor:'Portos de Galicia',cat:'galpón (alquiler, suministros)',desc:'Marpol',importe:114.51,pago:'transferencia',factura:'si'},
+{id:14,fecha:'17/01/2026',tipo:'Gasto',proveedor:'E.S. Eroski Noia',cat:'combustible coche',desc:'Gasoil',importe:53.01,pago:'tarjeta',factura:'no'},
+{id:15,fecha:'20/01/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Asesoría',importe:116.16,pago:'transferencia',factura:'si'},
+{id:16,fecha:'20/01/2026',tipo:'Gasto',proveedor:'Impuestos',cat:'seguridad social',desc:'Retención trabajadores',importe:45.35,pago:'transferencia',factura:'no'},
+{id:17,fecha:'27/01/2026',tipo:'Gasto',proveedor:'Triñanes',cat:'mantenimiento barco',desc:'Seguridad gancho, grasa spray',importe:20.53,pago:'efectivo',factura:'no'},
+{id:18,fecha:'27/01/2026',tipo:'Gasto',proveedor:'Petrocash',cat:'combustible coche',desc:'Gasoil coche',importe:79.31,pago:'tarjeta',factura:'no'},
+{id:19,fecha:'29/01/2026',tipo:'Gasto',proveedor:'Dyscatoil',cat:'combustible barco',desc:'Gasoil barco',importe:1452.78,pago:'tarjeta',factura:'si'},
+{id:20,fecha:'29/01/2026',tipo:'Gasto',proveedor:'Susavila',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Seguro coche',importe:509.42,pago:'transferencia',factura:'si'},
+{id:21,fecha:'31/01/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS PARADA',importe:328,pago:'transferencia',factura:'no'},
+{id:22,fecha:'31/01/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS MAURO',importe:177,pago:'transferencia',factura:'no'},
+{id:23,fecha:'31/01/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS DAMIÁN',importe:178,pago:'transferencia',factura:'no'},
+{id:24,fecha:'31/01/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS ROMÁN',importe:260,pago:'transferencia',factura:'no'},
+{id:25,fecha:'31/01/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS KATI',importe:286,pago:'transferencia',factura:'no'},
+{id:26,fecha:'31/01/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Gestoría',importe:152,pago:'transferencia',factura:'si'},
+{id:27,fecha:'31/01/2026',tipo:'Gasto',proveedor:'Sueldo',cat:'sueldos y nóminas',desc:'Sueldo Parada',importe:1517,pago:'efectivo',factura:'no'},
+{id:28,fecha:'2/02/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Préstamo barco',importe:1659.45,pago:'transferencia',factura:'no'},
+{id:29,fecha:'2/02/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'créditos y financieros',desc:'Intereses póliza',importe:101.07,pago:'transferencia',factura:'no'},
+{id:30,fecha:'2/02/2026',tipo:'Gasto',proveedor:'Plenergy',cat:'combustible coche',desc:'Gasoil',importe:51.72,pago:'tarjeta',factura:'no'},
+{id:31,fecha:'4/02/2026',tipo:'Gasto',proveedor:'Seguros marítimos Vigo',cat:'seguros',desc:'Seguro o Barreiras',importe:506.65,pago:'transferencia',factura:'si'},
+{id:32,fecha:'8/02/2026',tipo:'Gasto',proveedor:'Plenergy',cat:'combustible coche',desc:'Gasoil',importe:57,pago:'tarjeta',factura:'no'},
+{id:33,fecha:'18/02/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Asesoría',importe:116.6,pago:'transferencia',factura:'si'},
+{id:34,fecha:'25/02/2026',tipo:'Gasto',proveedor:'Carsan BP',cat:'combustible coche',desc:'Gasoil',importe:89.13,pago:'tarjeta',factura:'no'},
+{id:35,fecha:'27/02/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS PARADA',importe:338,pago:'transferencia',factura:'no'},
+{id:36,fecha:'27/02/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS MAURO',importe:188,pago:'transferencia',factura:'no'},
+{id:37,fecha:'27/02/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS ROMÁN',importe:266,pago:'transferencia',factura:'no'},
+{id:38,fecha:'27/02/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS KATI',importe:310,pago:'transferencia',factura:'no'},
+{id:39,fecha:'27/02/2026',tipo:'Gasto',proveedor:'Sueldo',cat:'sueldos y nóminas',desc:'Sueldo Parada',importe:1517,pago:'transferencia',factura:'no'},
+{id:40,fecha:'27/02/2026',tipo:'Gasto',proveedor:'Servimar',cat:'mantenimiento barco',desc:'Líquido antióxido',importe:10.45,pago:'efectivo',factura:'no'},
+{id:41,fecha:'2/03/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Asesoría',importe:152.5,pago:'transferencia',factura:'si'},
+{id:42,fecha:'3/03/2026',tipo:'Gasto',proveedor:'BP',cat:'combustible coche',desc:'Gasoil',importe:92,pago:'tarjeta',factura:'no'},
+{id:43,fecha:'4/03/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Préstamo barco',importe:1614,pago:'transferencia',factura:'no'},
+{id:44,fecha:'5/03/2026',tipo:'Gasto',proveedor:'BP',cat:'combustible coche',desc:'Gasoil',importe:85,pago:'tarjeta',factura:'no'},
+{id:45,fecha:'5/03/2026',tipo:'Gasto',proveedor:'JJ Chicolino',cat:'suministros explotación',desc:'Cordel negro',importe:10,pago:'efectivo',factura:'no'},
+{id:46,fecha:'5/03/2026',tipo:'Gasto',proveedor:'Elpideo',cat:'suministros explotación',desc:'Cabo para colectoras',importe:390,pago:'efectivo',factura:'no'},
+{id:47,fecha:'12/03/2026',tipo:'Gasto',proveedor:'Cepillos Mariño',cat:'suministros explotación',desc:'Cepillo cesto',importe:150,pago:'efectivo',factura:'no'},
+{id:48,fecha:'15/03/2026',tipo:'Gasto',proveedor:'Shell',cat:'combustible coche',desc:'Gasoil',importe:94,pago:'tarjeta',factura:'no'},
+{id:49,fecha:'17/03/2026',tipo:'Gasto',proveedor:'SBC',cat:'combustible coche',desc:'Gasoil',importe:69,pago:'tarjeta',factura:'no'},
+{id:50,fecha:'17/03/2026',tipo:'Gasto',proveedor:'Autopista',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:11,pago:'tarjeta',factura:'no'},
+{id:51,fecha:'20/03/2026',tipo:'Gasto',proveedor:'Restaurante',cat:'dietas y comidas',desc:'Menú de dous',importe:26,pago:'tarjeta',factura:'no'},
+{id:52,fecha:'20/03/2026',tipo:'Gasto',proveedor:'Petronor',cat:'combustible coche',desc:'Gasoil',importe:20,pago:'transferencia',factura:'no'},
+{id:53,fecha:'20/03/2026',tipo:'Gasto',proveedor:'Autopista',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:8,pago:'tarjeta',factura:'no'},
+{id:54,fecha:'22/03/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:62,pago:'transferencia',factura:'no'},
+{id:55,fecha:'22/03/2026',tipo:'Gasto',proveedor:'Carsan BP',cat:'combustible coche',desc:'Gasoil',importe:106,pago:'tarjeta',factura:'no'},
+{id:56,fecha:'22/03/2026',tipo:'Gasto',proveedor:'Autopista',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:16,pago:'transferencia',factura:'no'},
+{id:57,fecha:'23/03/2026',tipo:'Gasto',proveedor:'La Frontera',cat:'dietas y comidas',desc:'Comida',importe:43,pago:'tarjeta',factura:'no'},
+{id:58,fecha:'25/03/2026',tipo:'Gasto',proveedor:'Triñanes',cat:'mantenimiento barco',desc:'Grasa, repuesto ganchos',importe:19.46,pago:'tarjeta',factura:'no'},
+{id:59,fecha:'25/03/2026',tipo:'Gasto',proveedor:'Plenergy',cat:'combustible coche',desc:'Gasoil',importe:79,pago:'tarjeta',factura:'no'},
+{id:60,fecha:'25/03/2026',tipo:'Gasto',proveedor:'Chino',cat:'suministros explotación',desc:'Guantes',importe:5.4,pago:'transferencia',factura:'no'},
+{id:61,fecha:'27/03/2026',tipo:'Gasto',proveedor:'Hipermarket',cat:'suministros explotación',desc:'Lona e piquetas',importe:17.45,pago:'efectivo',factura:'no'},
+{id:62,fecha:'29/03/2026',tipo:'Gasto',proveedor:'Plenergy',cat:'combustible coche',desc:'Gasoil',importe:74.26,pago:'tarjeta',factura:'no'},
+{id:63,fecha:'31/03/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS Parada',importe:338,pago:'transferencia',factura:'no'},
+{id:64,fecha:'31/03/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS MAURO',importe:188.07,pago:'transferencia',factura:'no'},
+{id:65,fecha:'31/03/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS ROMÁN',importe:266.51,pago:'transferencia',factura:'no'},
+{id:66,fecha:'31/03/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS KATI',importe:310.05,pago:'transferencia',factura:'no'},
+{id:67,fecha:'31/03/2026',tipo:'Gasto',proveedor:'Nómina',cat:'sueldos y nóminas',desc:'Nómina marzo Parada',importe:1214,pago:'transferencia',factura:'no'},
+{id:68,fecha:'31/03/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:52,pago:'tarjeta',factura:'no'},
+{id:69,fecha:'1/04/2026',tipo:'Gasto',proveedor:'Trapega',cat:'seguros',desc:'Prevención riesgos laborales',importe:148,pago:'transferencia',factura:'si'},
+{id:70,fecha:'1/04/2026',tipo:'Gasto',proveedor:'Autopista',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:31,pago:'tarjeta',factura:'no'},
+{id:71,fecha:'1/04/2026',tipo:'Gasto',proveedor:'Aspromeri',cat:'asociaciones (Aspromeri)',desc:'Gastos de socio',importe:703,pago:'transferencia',factura:'si'},
+{id:72,fecha:'2/04/2026',tipo:'Gasto',proveedor:'Afigal',cat:'créditos y financieros',desc:'Comisión préstamo',importe:692.31,pago:'transferencia',factura:'no'},
+{id:73,fecha:'2/04/2026',tipo:'Gasto',proveedor:'Gasolinera',cat:'combustible coche',desc:'Gasoil',importe:81.32,pago:'tarjeta',factura:'no'},
+{id:74,fecha:'4/04/2026',tipo:'Gasto',proveedor:'Aspromeri',cat:'asociaciones (Aspromeri)',desc:'Cuotas de socio',importe:792,pago:'transferencia',factura:'si'},
+{id:75,fecha:'5/04/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Préstamo barco',importe:1651,pago:'transferencia',factura:'no'},
+{id:76,fecha:'9/04/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'seguros',desc:'Seguro de vida póliza',importe:659,pago:'transferencia',factura:'no'},
+{id:77,fecha:'9/04/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'créditos y financieros',desc:'Intereses póliza',importe:104,pago:'transferencia',factura:'no'},
+{id:78,fecha:'9/04/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'créditos y financieros',desc:'Comisión apertura póliza',importe:625,pago:'transferencia',factura:'no'},
+{id:79,fecha:'10/04/2026',tipo:'Gasto',proveedor:'Dyscatoil',cat:'combustible barco',desc:'Gasoil barco',importe:1409.95,pago:'tarjeta',factura:'si'},
+{id:80,fecha:'10/04/2026',tipo:'Gasto',proveedor:'Triñanes',cat:'mantenimiento barco',desc:'Grasa spray',importe:25.3,pago:'efectivo',factura:'no'},
+{id:81,fecha:'11/04/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Intereses póliza',importe:68.93,pago:'transferencia',factura:'no'},
+{id:82,fecha:'14/04/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:90.32,pago:'tarjeta',factura:'no'},
+{id:83,fecha:'17/04/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:124,pago:'tarjeta',factura:'no'},
+{id:84,fecha:'17/04/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:15,pago:'tarjeta',factura:'no'},
+{id:85,fecha:'20/04/2026',tipo:'Gasto',proveedor:'La Frontera',cat:'dietas y comidas',desc:'Comida',importe:75,pago:'tarjeta',factura:'no'},
+{id:86,fecha:'20/04/2026',tipo:'Gasto',proveedor:'Hacienda',cat:'impuestos',desc:'Trimestre 1º',importe:396,pago:'transferencia',factura:'no'},
+{id:87,fecha:'20/04/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:39,pago:'tarjeta',factura:'no'},
+{id:88,fecha:'20/04/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:15,pago:'tarjeta',factura:'no'},
+{id:89,fecha:'25/04/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:95,pago:'tarjeta',factura:'no'},
+{id:90,fecha:'28/04/2026',tipo:'Gasto',proveedor:'Talleres Milocho',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Rodas',importe:308.4,pago:'transferencia',factura:'si'},
+{id:91,fecha:'28/04/2026',tipo:'Gasto',proveedor:'Talleres Milocho',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Embrague, mantenimiento',importe:1535,pago:'transferencia',factura:'si'},
+{id:92,fecha:'30/04/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:51.19,pago:'tarjeta',factura:'no'},
+{id:93,fecha:'30/04/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:30,pago:'tarjeta',factura:'no'},
+{id:94,fecha:'30/04/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS PARADA',importe:141,pago:'transferencia',factura:'no'},
+{id:95,fecha:'30/04/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS MAURO',importe:171,pago:'transferencia',factura:'no'},
+{id:96,fecha:'30/04/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS ROMÁN',importe:310,pago:'transferencia',factura:'no'},
+{id:97,fecha:'30/04/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS KATI',importe:266,pago:'transferencia',factura:'no'},
+{id:98,fecha:'30/04/2026',tipo:'Gasto',proveedor:'Nómina',cat:'sueldos y nóminas',desc:'Nómina abril Parada',importe:1517,pago:'transferencia',factura:'no'},
+{id:99,fecha:'4/05/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Préstamo barco',importe:1614,pago:'transferencia',factura:'no'},
+{id:100,fecha:'4/05/2026',tipo:'Gasto',proveedor:'La Frontera',cat:'dietas y comidas',desc:'Comida',importe:46,pago:'tarjeta',factura:'no'},
+{id:101,fecha:'4/05/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:15,pago:'tarjeta',factura:'no'},
+{id:102,fecha:'4/05/2026',tipo:'Gasto',proveedor:'Hipermarket',cat:'suministros explotación',desc:'Capachos, mango',importe:10.4,pago:'efectivo',factura:'no'},
+{id:103,fecha:'4/05/2026',tipo:'Gasto',proveedor:'Seguros marítimos Vigo',cat:'seguros',desc:'Seguro o Barreiras',importe:506.65,pago:'transferencia',factura:'si'},
+{id:104,fecha:'5/05/2026',tipo:'Gasto',proveedor:'JJ Chicolino',cat:'suministros explotación',desc:'Lino, cabo',importe:318.67,pago:'tarjeta',factura:'no'},
+{id:105,fecha:'7/05/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'créditos y financieros',desc:'Intereses póliza',importe:126,pago:'transferencia',factura:'no'},
+{id:106,fecha:'7/05/2026',tipo:'Gasto',proveedor:'BP',cat:'combustible coche',desc:'Gasoil',importe:20,pago:'efectivo',factura:'no'},
+{id:107,fecha:'7/05/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:94,pago:'tarjeta',factura:'no'},
+{id:108,fecha:'9/05/2026',tipo:'Gasto',proveedor:'Electricista',cat:'mantenimiento barco',desc:'Cable mando tolva',importe:80,pago:'efectivo',factura:'no'},
+{id:109,fecha:'10/05/2026',tipo:'Gasto',proveedor:'Eroski Noia',cat:'combustible coche',desc:'Gasoil',importe:87,pago:'tarjeta',factura:'no'},
+{id:110,fecha:'11/05/2026',tipo:'Gasto',proveedor:'Recinet',cat:'suministros explotación',desc:'Rede de cría',importe:1452,pago:'transferencia',factura:'si'},
+{id:111,fecha:'12/05/2026',tipo:'Gasto',proveedor:'Mercamas',cat:'dietas y comidas',desc:'Bocatas, agua',importe:18,pago:'efectivo',factura:'no'},
+{id:112,fecha:'13/05/2026',tipo:'Gasto',proveedor:'Portos',cat:'galpón (alquiler, suministros)',desc:'Galpón, agua, electricidad',importe:314.36,pago:'transferencia',factura:'si'},
+{id:113,fecha:'14/05/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:75,pago:'tarjeta',factura:'no'},
+{id:114,fecha:'14/05/2026',tipo:'Gasto',proveedor:'La Frontera',cat:'dietas y comidas',desc:'Comida',importe:58,pago:'tarjeta',factura:'no'},
+{id:115,fecha:'14/05/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:15,pago:'tarjeta',factura:'no'},
+{id:116,fecha:'18/05/2026',tipo:'Gasto',proveedor:'Audasa',cat:'vehículo (seguros, peajes, reparaciones)',desc:'Peajes',importe:25,pago:'transferencia',factura:'no'},
+{id:117,fecha:'20/05/2026',tipo:'Gasto',proveedor:'Staroil',cat:'combustible coche',desc:'Gasoil',importe:130,pago:'tarjeta',factura:'no'},
+{id:118,fecha:'25/05/2026',tipo:'Gasto',proveedor:'A Poutada',cat:'suministros explotación',desc:'Navallas',importe:17.5,pago:'efectivo',factura:'no'},
+{id:119,fecha:'27/05/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Asesoría',importe:152,pago:'transferencia',factura:'si'},
+{id:120,fecha:'29/05/2026',tipo:'Gasto',proveedor:'Servimar',cat:'suministros explotación',desc:'Botas, antióxido',importe:92.95,pago:'transferencia',factura:'no'},
+{id:121,fecha:'30/05/2026',tipo:'Gasto',proveedor:'Triñanes',cat:'mantenimiento barco',desc:'Gancho, roda remolque',importe:67.8,pago:'tarjeta',factura:'no'},
+{id:122,fecha:'30/05/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS PARADA',importe:141,pago:'transferencia',factura:'no'},
+{id:123,fecha:'30/05/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS MAURO',importe:171,pago:'transferencia',factura:'no'},
+{id:124,fecha:'30/05/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS ROMÁN',importe:310,pago:'transferencia',factura:'no'},
+{id:125,fecha:'30/05/2026',tipo:'Gasto',proveedor:'S.S.',cat:'seguridad social',desc:'SS KATI',importe:266,pago:'transferencia',factura:'no'},
+{id:126,fecha:'30/05/2026',tipo:'Gasto',proveedor:'Nómina',cat:'sueldos y nóminas',desc:'Nómina mayo Parada',importe:1517,pago:'transferencia',factura:'no'},
+{id:127,fecha:'1/06/2026',tipo:'Gasto',proveedor:'Abanca',cat:'créditos y financieros',desc:'Préstamo barco',importe:1614,pago:'transferencia',factura:'no'},
+{id:128,fecha:'1/06/2026',tipo:'Gasto',proveedor:'Asemar',cat:'gestoría / asesoría',desc:'Asesoría',importe:150,pago:'transferencia',factura:'si'},
+{id:129,fecha:'1/06/2026',tipo:'Gasto',proveedor:'Sabadell',cat:'créditos y financieros',desc:'Intereses póliza',importe:135,pago:'transferencia',factura:'no'},
+{id:130,fecha:'1/06/2026',tipo:'Gasto',proveedor:'Triñanes',cat:'mantenimiento barco',desc:'Sica',importe:15,pago:'efectivo',factura:'no'},
+{id:131,fecha:'28/01/2026',tipo:'Ingreso',proveedor:'1ª quincena noviembre',cat:'Mejillón',desc:'Venta mejillón',importe:8255.3,pago:'transferencia',factura:'si'},
+{id:132,fecha:'25/03/2026',tipo:'Ingreso',proveedor:'1ª quincena enero',cat:'Mejillón',desc:'Venta mejillón',importe:10443,pago:'transferencia',factura:'si'},
+{id:133,fecha:'12/02/2026',tipo:'Ingreso',proveedor:'Venta mejillón',cat:'Mejillón',desc:'Venta mejillón',importe:8886.8,pago:'transferencia',factura:'si'},
+{id:134,fecha:'10/02/2026',tipo:'Ingreso',proveedor:'Traballos a Choto',cat:'Servicios a terceros',desc:'Servicios a terceros',importe:3094,pago:'efectivo',factura:'no'},
+{id:135,fecha:'13/04/2026',tipo:'Ingreso',proveedor:'Venta 2ª quincena enero',cat:'Mejillón',desc:'Venta mejillón',importe:12002.78,pago:'transferencia',factura:'si'},
+{id:136,fecha:'23/04/2026',tipo:'Ingreso',proveedor:'Suso',cat:'Servicios a terceros',desc:'Servicios a terceros',importe:709,pago:'efectivo',factura:'no'}
+];
+
+const PROG_ORIG=[
+{id:'p1',nombre:'Préstamo barco (Abanca)',cat:'créditos y financieros',importe:1614,dia:1,pago:'transferencia',ultimaCarga:''},
+{id:'p2',nombre:'Intereses póliza (Sabadell)',cat:'créditos y financieros',importe:130,dia:7,pago:'transferencia',ultimaCarga:''},
+{id:'p3',nombre:'Seguridad Social trabajadores',cat:'seguridad social',importe:888,dia:28,pago:'transferencia',ultimaCarga:''},
+{id:'p4',nombre:'Nómina Parada',cat:'sueldos y nóminas',importe:1517,dia:30,pago:'transferencia',ultimaCarga:''},
+{id:'p5',nombre:'Asesoría Asemar',cat:'gestoría / asesoría',importe:152,dia:1,pago:'transferencia',ultimaCarga:''},
+{id:'p6',nombre:'Alquiler + suministros Portos',cat:'galpón (alquiler, suministros)',importe:700,dia:15,pago:'transferencia',ultimaCarga:''},
+{id:'p7',nombre:'Seguro o Barreiras',cat:'seguros',importe:506.65,dia:4,pago:'transferencia',ultimaCarga:''}
+];
+
+let movimientos=[], programados=[], nextId=200, movFiltrados=[];
+let chMes,chCat,chBal;
+let sb=null, syncCode=null, syncing=false;
+let movPage=1; const PAGE_SIZE=50;
+let auditoria=[];
+
+/* ---------- PERSISTENCIA ---------- */
+function cargar(){
+  try{
+    const m=localStorage.getItem('marea_mov'), p=localStorage.getItem('marea_prog'), n=localStorage.getItem('marea_nextid');
+    const cg=localStorage.getItem('marea_catg'), ci=localStorage.getItem('marea_cati'), au=localStorage.getItem('marea_audit');
+    movimientos = m ? JSON.parse(m) : JSON.parse(JSON.stringify(ORIGINAL));
+    programados = p ? JSON.parse(p) : JSON.parse(JSON.stringify(PROG_ORIG));
+    nextId = n ? parseInt(n) : 200;
+    if(cg)CATS_GASTO=JSON.parse(cg);
+    if(ci)CATS_INGRESO=JSON.parse(ci);
+    if(au)auditoria=JSON.parse(au);
+  }catch(e){
+    movimientos=JSON.parse(JSON.stringify(ORIGINAL));
+    programados=JSON.parse(JSON.stringify(PROG_ORIG));
+  }
+  programados.forEach(p=>{if(p.ultimaCarga===undefined)p.ultimaCarga='';});
+  recomputarCats();
+}
+function guardar(){
+  try{
+    localStorage.setItem('marea_mov',JSON.stringify(movimientos));
+    localStorage.setItem('marea_prog',JSON.stringify(programados));
+    localStorage.setItem('marea_nextid',String(nextId));
+    localStorage.setItem('marea_catg',JSON.stringify(CATS_GASTO));
+    localStorage.setItem('marea_cati',JSON.stringify(CATS_INGRESO));
+    localStorage.setItem('marea_audit',JSON.stringify(auditoria.slice(-100)));
+  }catch(e){}
+  if(syncCode)subirNube();
+}
+function logAudit(accion){
+  auditoria.push({t:new Date().toLocaleString('es-ES'),a:accion});
+  if(auditoria.length>100)auditoria=auditoria.slice(-100);
+}
+
+/* ---------- SUPABASE SYNC ---------- */
+function initSB(){
+  try{ if(window.supabase) sb=window.supabase.createClient(SB_URL,SB_KEY); }catch(e){}
+  syncCode=localStorage.getItem('marea_sync')||null;
+  if(syncCode)setSyncUI('on');else setSyncUI('off');
+}
+function setSyncUI(estado){
+  const dot=document.getElementById('syncDot'), txt=document.getElementById('syncTxt'), ic=dot.querySelector('i');
+  dot.className='sync-dot '+(estado==='on'?'sync-on':estado==='sync'?'sync-sync':'sync-off');
+  if(estado==='sync'){ic.className='ti ti-cloud-up';txt.textContent='Sincronizando…';}
+  else if(estado==='on'){ic.className='ti ti-cloud-check';txt.textContent='En la nube';}
+  else{ic.className='ti ti-cloud-off';txt.textContent='Local';}
+}
+async function activarSync(){
+  const code=document.getElementById('syncCode').value.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  if(!code||code.length<4){toast('El código debe tener al menos 4 caracteres (letras, números, guiones)',true);return;}
+  if(!sb){toast('No se pudo conectar con la nube',true);return;}
+  syncCode=code; localStorage.setItem('marea_sync',code);
+  setSyncUI('sync'); showOverlay('Conectando con la nube…');
+  try{
+    const {data}=await sb.from('movimientos').select('id').eq('device_id',code).limit(1);
+    if(data&&data.length){
+      if(confirm('Ya existen datos en la nube con ese código. ¿Descargarlos? (Reemplazará lo que ves ahora)')){
+        await bajarNube();
+      } else { await subirNube(); }
+    } else {
+      await subirNube();
+    }
+    setSyncUI('on'); logAudit('Sincronización activada: '+code);
+    toast('Sincronización activada ✓');
+  }catch(e){ setSyncUI('off'); toast('Error al sincronizar: '+e.message,true); syncCode=null; localStorage.removeItem('marea_sync'); }
+  hideOverlay();
+}
+function desactivarSync(){
+  if(!confirm('¿Trabajar solo en local? Tus datos seguirán en este navegador pero no se sincronizarán.'))return;
+  syncCode=null; localStorage.removeItem('marea_sync'); setSyncUI('off'); toast('Sincronización desactivada');
+}
+let subirTimer=null;
+function subirNube(){ clearTimeout(subirTimer); subirTimer=setTimeout(subirNubeNow,800); }
+async function subirNubeNow(){
+  if(!sb||!syncCode||syncing)return; syncing=true; setSyncUI('sync');
+  try{
+    await sb.from('movimientos').delete().eq('device_id',syncCode);
+    if(movimientos.length){
+      const rows=movimientos.map(m=>({id:m.id,device_id:syncCode,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,descripcion:m.desc,importe:m.importe,pago:m.pago,factura:m.factura}));
+      for(let i=0;i<rows.length;i+=500){ await sb.from('movimientos').upsert(rows.slice(i,i+500)); }
+    }
+    await sb.from('programados').delete().eq('device_id',syncCode);
+    if(programados.length){
+      await sb.from('programados').upsert(programados.map(p=>({id:p.id,device_id:syncCode,nombre:p.nombre,cat:p.cat,importe:p.importe,dia:p.dia,pago:p.pago,ultima_carga:p.ultimaCarga})));
+    }
+    await sb.from('config_app').upsert([
+      {key:'catg',device_id:syncCode,value:JSON.stringify(CATS_GASTO)},
+      {key:'cati',device_id:syncCode,value:JSON.stringify(CATS_INGRESO)},
+      {key:'nextid',device_id:syncCode,value:String(nextId)}
+    ]);
+    setSyncUI('on');
+  }catch(e){ setSyncUI('on'); }
+  syncing=false;
+}
+async function bajarNube(){
+  if(!sb||!syncCode)return;
+  const {data:mv}=await sb.from('movimientos').select('*').eq('device_id',syncCode);
+  const {data:pr}=await sb.from('programados').select('*').eq('device_id',syncCode);
+  const {data:cf}=await sb.from('config_app').select('*').eq('device_id',syncCode);
+  if(mv)movimientos=mv.map(m=>({id:m.id,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,desc:m.descripcion,importe:Number(m.importe),pago:m.pago,factura:m.factura}));
+  if(pr)programados=pr.map(p=>({id:p.id,nombre:p.nombre,cat:p.cat,importe:Number(p.importe),dia:p.dia,pago:p.pago,ultimaCarga:p.ultima_carga||''}));
+  if(cf){cf.forEach(c=>{ if(c.key==='catg')CATS_GASTO=JSON.parse(c.value); if(c.key==='cati')CATS_INGRESO=JSON.parse(c.value); if(c.key==='nextid')nextId=parseInt(c.value)||200; });}
+  recomputarCats();
+  localStorage.setItem('marea_mov',JSON.stringify(movimientos));
+  localStorage.setItem('marea_prog',JSON.stringify(programados));
+}
+
+/* ---------- UTILIDADES ---------- */
+function showOverlay(t){document.getElementById('overlayTxt').textContent=t||'Procesando…';document.getElementById('overlayLoad').classList.add('show');}
+function hideOverlay(){document.getElementById('overlayLoad').classList.remove('show');}
+function toast(t,err){const el=document.getElementById('toast');el.innerHTML=`<i class="ti ti-${err?'alert-circle':'circle-check'}"></i> ${esc(t)}`;el.className='toast show'+(err?' err':'');clearTimeout(el._t);el._t=setTimeout(()=>el.className='toast',2800);}
+function getMes(f){return f.split('/')[1].padStart(2,'0');}
+function fmtFecha(f){const p=f.split('/');return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
+function toDate(f){
+  if(!f)return new Date(NaN);
+  let p;
+  if(f.includes('/'))p=f.split('/');
+  else if(f.includes('-')){const q=f.split('-');p=q[0].length===4?[q[2],q[1],q[0]]:q;}
+  else return new Date(NaN);
+  if(p.length<3)return new Date(NaN);
+  return new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0]));
+}
+function agrupa(s){return String(s).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+function eur(n){const neg=Number(n)<0;const x=Math.abs(Number(n)).toFixed(2).split('.');return (neg?'-':'')+agrupa(x[0])+','+x[1];}
+function mesActual(){const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;}
+async function sha256(txt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+function animarMetrica(id,valor){
+  const el=document.getElementById(id), prev=parseFloat(el.dataset.eur)||0;
+  el.dataset.eur=valor; const dur=500, t0=performance.now(), signo=id==='mRes'&&valor>=0?'+':'';
+  function step(t){const k=Math.min((t-t0)/dur,1), v=prev+(valor-prev)*(1-Math.pow(1-k,3));
+    el.textContent=signo+eur(v)+' €'; if(k<1)requestAnimationFrame(step);}
+  requestAnimationFrame(step);
+}
+
+/* ---------- PIN (con hash) ---------- */
+let pinModo='entrar', pinTemp='';
+async function initPin(){
+  const pin=localStorage.getItem('marea_pin');
+  if(pin===null){ pinModo='crear'; document.getElementById('lockMsg').textContent='Crea un PIN de 4 dígitos'; document.getElementById('pinBtn').textContent='Crear PIN'; }
+  else if(pin===''){ document.getElementById('lockScreen').style.display='none'; arrancarApp(); return; }
+  else { pinModo='entrar'; }
+  document.getElementById('pinInput').focus();
+}
+async function accionPin(){
+  const val=document.getElementById('pinInput').value.trim();
+  const err=document.getElementById('pinErr');
+  if(!/^\d{4}$/.test(val)){ err.textContent='El PIN debe tener 4 dígitos.'; return; }
+  if(pinModo==='crear'){
+    if(pinTemp===''){ pinTemp=val; document.getElementById('lockMsg').textContent='Repite el PIN para confirmar'; document.getElementById('pinInput').value=''; err.textContent=''; document.getElementById('pinInput').focus(); return; }
+    if(val!==pinTemp){ err.textContent='No coincide. Empieza de nuevo.'; pinTemp=''; document.getElementById('lockMsg').textContent='Crea un PIN de 4 dígitos'; document.getElementById('pinInput').value=''; return; }
+    localStorage.setItem('marea_pin',await sha256(val)); desbloquear();
+  } else {
+    if(await sha256(val)!==localStorage.getItem('marea_pin')){ err.textContent='PIN incorrecto.'; document.getElementById('pinInput').value=''; return; }
+    desbloquear();
+  }
+}
+function desbloquear(){ document.getElementById('lockScreen').style.display='none'; document.getElementById('pinInput').value=''; if(!window._arrancado)arrancarApp(); resetIdle(); }
+document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='Enter')accionPin();});
+async function cambiarPin(){
+  const a=prompt('Nuevo PIN (4 dígitos):'); if(a===null)return;
+  if(!/^\d{4}$/.test(a.trim())){alert('Debe tener 4 dígitos.');return;}
+  const b=prompt('Repite el nuevo PIN:'); if(b===null)return;
+  if(a.trim()!==b.trim()){alert('No coinciden.');return;}
+  localStorage.setItem('marea_pin',await sha256(a.trim())); toast('PIN actualizado');
+}
+function quitarPin(){
+  if(!confirm('¿Quitar el PIN? La app dejará de pedirlo al entrar.'))return;
+  localStorage.setItem('marea_pin',''); toast('PIN desactivado');
+}
+function bloquearAhora(){
+  if(localStorage.getItem('marea_pin')){ pinModo='entrar'; document.getElementById('lockMsg').textContent='Introduce tu PIN'; document.getElementById('pinBtn').textContent='Entrar'; document.getElementById('lockScreen').style.display='flex'; document.getElementById('pinInput').focus(); }
+  else toast('No hay PIN configurado',true);
+}
+
+/* ---------- AUTO-BLOQUEO ---------- */
+let idleTimer=null;
+function resetIdle(){
+  clearTimeout(idleTimer);
+  if(localStorage.getItem('marea_autolock')==='1'&&localStorage.getItem('marea_pin')){
+    idleTimer=setTimeout(()=>bloquearAhora(),5*60*1000);
+  }
+}
+function toggleAutoLock(){
+  const on=document.getElementById('autoLock').checked;
+  if(on&&!localStorage.getItem('marea_pin')){alert('Primero configura un PIN para usar el auto-bloqueo.');document.getElementById('autoLock').checked=false;return;}
+  localStorage.setItem('marea_autolock',on?'1':'0'); resetIdle(); toast(on?'Auto-bloqueo activado':'Auto-bloqueo desactivado');
+}
+['mousemove','keydown','click','touchstart'].forEach(ev=>document.addEventListener(ev,resetIdle,{passive:true}));
+
+/* ---------- NOTIFICACIONES ---------- */
+async function toggleNotif(){
+  const cb=document.getElementById('notifPerm');
+  if(cb.checked){
+    if(!('Notification' in window)){alert('Tu navegador no soporta notificaciones.');cb.checked=false;return;}
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){cb.checked=false;toast('Permiso denegado',true);return;}
+    localStorage.setItem('marea_notif','1'); toast('Avisos activados'); avisarVencimientos();
+  } else { localStorage.setItem('marea_notif','0'); toast('Avisos desactivados'); }
+}
+function avisarVencimientos(){
+  if(localStorage.getItem('marea_notif')!=='1'||Notification.permission!=='granted')return;
+  const pend=vencimientosPendientes();
+  if(pend.length){
+    const hoy=new Date().toDateString();
+    if(localStorage.getItem('marea_notif_last')===hoy)return;
+    localStorage.setItem('marea_notif_last',hoy);
+    new Notification('MexiContas — Vencimientos',{body:`Tienes ${pend.length} gasto(s) programado(s) por cargar este mes.`,icon:''});
+  }
+}
+
+/* ---------- NAV ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('sec-'+t.dataset.sec).classList.add('active');
+  t.classList.add('active');
+  if(t.dataset.sec==='resumen')buildCharts();
+  if(t.dataset.sec==='movimientos'){poblarFiltroCat();movPage=1;renderTabla();}
+  if(t.dataset.sec==='programados')renderProg();
+  if(t.dataset.sec==='nuevo')renderAvisosNuevo();
+  if(t.dataset.sec==='categorias')renderCats();
+  if(t.dataset.sec==='datos')renderAudit();
+});
+
+/* ---------- RESUMEN ---------- */
+function rangoResumen(){
+  const d=document.getElementById('rDesde').value, h=document.getElementById('rHasta').value;
+  return movimientos.filter(m=>{
+    const f=toDate(m.fecha);
+    if(d && f < new Date(d))return false;
+    if(h && f > new Date(h+'T23:59:59'))return false;
+    return true;
+  });
+}
+function limpiarResumen(){document.getElementById('rDesde').value='';document.getElementById('rHasta').value='';buildCharts();}
+function buildCharts(){
+  const MESES=['01','02','03','04','05','06','07','08','09','10','11','12'],ML=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const datos=rangoResumen();
+  const g=datos.filter(m=>m.tipo==='Gasto'),i=datos.filter(m=>m.tipo==='Ingreso');
+  let maxMes=0;datos.forEach(m=>{const idx=parseInt(getMes(m.fecha));if(idx>maxMes)maxMes=idx;});
+  const nMeses=Math.max(maxMes,6);
+  const meses=MESES.slice(0,nMeses),labels=ML.slice(0,nMeses);
+  const gm=meses.map(mo=>g.filter(x=>getMes(x.fecha)===mo).reduce((a,b)=>a+b.importe,0));
+  const im=meses.map(mo=>i.filter(x=>getMes(x.fecha)===mo).reduce((a,b)=>a+b.importe,0));
+  const totG=g.reduce((a,b)=>a+b.importe,0),totI=i.reduce((a,b)=>a+b.importe,0);
+
+  animarMetrica('mIng',totI); animarMetrica('mGas',totG); animarMetrica('mRes',totI-totG);
+  document.getElementById('mNum').textContent=datos.length;
+
+  if(chMes)chMes.destroy();if(chCat)chCat.destroy();if(chBal)chBal.destroy();
+  const gridC='rgba(128,128,128,.12)';
+  chMes=new Chart(document.getElementById('chartMes'),{type:'bar',data:{labels,datasets:[{label:'Gastos',data:gm,backgroundColor:'#E24B4A',borderRadius:4},{label:'Ingresos',data:im,backgroundColor:'#1D9E75',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:gridC},ticks:{font:{size:10},callback:v=>'€'+agrupa(Math.round(v))}}}}});
+
+  const cats={};g.forEach(x=>{cats[x.cat]=(cats[x.cat]||0)+x.importe;});
+  const ce=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  // Paleta accesible (Okabe-Ito + extras, evita confusión rojo/verde)
+  const colors=['#0072B2','#E69F00','#009E73','#CC79A7','#56B4E9','#D55E00','#F0E442','#999999','#785EF0','#648FFF','#FE6100','#8AC926','#1982C4','#6A4C93','#FFA69E'];
+  chCat=new Chart(document.getElementById('chartCat'),{type:'doughnut',data:{labels:ce.map(c=>c[0]),datasets:[{data:ce.map(c=>Math.round(c[1])),backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:9,padding:5}},tooltip:{callbacks:{label:c=>` ${c.label}: ${eur(c.raw)} €`}}}}});
+
+  const bal=meses.map((mo,idx)=>im[idx]-gm[idx]);
+  chBal=new Chart(document.getElementById('chartBal'),{type:'bar',data:{labels,datasets:[{data:bal,backgroundColor:bal.map(v=>v>=0?'#1D9E75':'#E24B4A'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${eur(c.raw)} €`}}},scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:gridC},ticks:{font:{size:10},callback:v=>'€'+agrupa(Math.round(v))}}}}});
+
+  const tot=ce.reduce((a,b)=>a+b[1],0);
+  document.getElementById('catTable').innerHTML=ce.length?ce.map(([c,v])=>`<tr><td><span class="badge bc">${esc(c)}</span></td><td style="text-align:right;font-weight:600">${eur(v)} €</td><td style="text-align:right;color:var(--text2)">${tot?((v/tot)*100).toFixed(1):0}%</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--text2)">Sin datos en el periodo.</td></tr>';
+}
+
+/* ---------- MOVIMIENTOS ---------- */
+function poblarFiltroCat(){
+  const tipo=document.getElementById('fTipo').value;
+  let cats;
+  if(tipo==='Gasto')cats=CATS_GASTO.filter(c=>movimientos.some(m=>m.cat===c));
+  else if(tipo==='Ingreso')cats=CATS_INGRESO.filter(c=>movimientos.some(m=>m.cat===c));
+  else cats=[...new Set(movimientos.map(m=>m.cat))].sort();
+  const s=document.getElementById('fCat'), prev=s.value;
+  s.innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  if([...s.options].some(o=>o.value===prev))s.value=prev;else s.value='';
+}
+function filtrarMov(){
+  const tipo=document.getElementById('fTipo').value, cat=document.getElementById('fCat').value, txt=document.getElementById('fTxt').value.toLowerCase();
+  const d=document.getElementById('fDesde').value, h=document.getElementById('fHasta').value;
+  return movimientos.filter(m=>{
+    if(tipo&&m.tipo!==tipo)return false;
+    if(cat&&m.cat!==cat)return false;
+    const fe=toDate(m.fecha);
+    if(d&&fe<new Date(d))return false;
+    if(h&&fe>new Date(h+'T23:59:59'))return false;
+    if(txt&&!m.proveedor.toLowerCase().includes(txt)&&!m.desc.toLowerCase().includes(txt)&&!m.cat.toLowerCase().includes(txt))return false;
+    return true;
+  });
+}
+function renderTabla(){
+  let f=filtrarMov();
+  f.sort((a,b)=>toDate(b.fecha)-toDate(a.fecha));
+  movFiltrados=f;
+  const totPag=Math.max(1,Math.ceil(f.length/PAGE_SIZE));
+  if(movPage>totPag)movPage=totPag;
+  const pageItems=f.slice((movPage-1)*PAGE_SIZE,movPage*PAGE_SIZE);
+
+  document.getElementById('movTabla').innerHTML=pageItems.map(m=>`<tr>
+    <td style="white-space:nowrap;font-size:11px">${esc(m.fecha)}</td>
+    <td><span class="badge ${m.tipo==='Ingreso'?'bi':'bg'}">${m.tipo}</span></td>
+    <td>${esc(m.proveedor)}</td>
+    <td><span class="badge bc" style="font-size:10px">${esc(m.cat)}</span></td>
+    <td style="text-align:right;font-weight:600;${m.tipo==='Ingreso'?'color:var(--green-d)':''};white-space:nowrap">${m.tipo==='Gasto'?'-':''}${eur(m.importe)} €</td>
+    <td style="color:var(--text2);font-size:11px">${esc(m.pago)}</td>
+    <td style="text-align:center;white-space:nowrap"><button class="icon-btn" onclick="editMov(${m.id})" title="Editar"><i class="ti ti-edit"></i></button><button class="icon-btn btn-danger" onclick="delMov(${m.id})" title="Eliminar"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('');
+
+  document.getElementById('movCards').innerHTML=pageItems.map(m=>`<div class="mcard">
+    <div class="mcard-top"><span class="mcard-prov">${esc(m.proveedor)}</span><span class="mcard-imp ${m.tipo==='Ingreso'?'green':'red'}">${m.tipo==='Gasto'?'-':''}${eur(m.importe)} €</span></div>
+    <div class="mcard-meta"><span class="badge ${m.tipo==='Ingreso'?'bi':'bg'}">${m.tipo}</span><span class="badge bc">${esc(m.cat)}</span><span>${esc(m.fecha)}</span><span>· ${esc(m.pago)}</span></div>
+    ${m.desc?`<div style="font-size:12px;color:var(--text2);margin-top:5px">${esc(m.desc)}</div>`:''}
+    <div class="mcard-actions"><button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button><button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></div>
+  </div>`).join('');
+
+  document.getElementById('movPag').innerHTML = totPag>1 ?
+    `<button class="btn" ${movPage<=1?'disabled':''} onclick="movPage--;renderTabla()"><i class="ti ti-chevron-left"></i></button>
+     <span>Página ${movPage} de ${totPag}</span>
+     <button class="btn" ${movPage>=totPag?'disabled':''} onclick="movPage++;renderTabla()"><i class="ti ti-chevron-right"></i></button>` : '';
+
+  const totG=f.filter(m=>m.tipo==='Gasto').reduce((s,m)=>s+m.importe,0);
+  const totI=f.filter(m=>m.tipo==='Ingreso').reduce((s,m)=>s+m.importe,0);
+  const saldo=totI-totG;
+  document.getElementById('movCount').innerHTML=`${f.length} movimientos · Ingresos: <span class="saldo-pos">${eur(totI)} €</span> · Gastos: <span class="saldo-neg">${eur(totG)} €</span> · Saldo: <span class="${saldo>=0?'saldo-pos':'saldo-neg'}">${saldo>=0?'+':''}${eur(saldo)} €</span>`;
+}
+function limpiarFiltros(){
+  ['fTipo','fCat','fDesde','fHasta','fTxt'].forEach(id=>document.getElementById(id).value='');
+  poblarFiltroCat(); movPage=1; renderTabla(); toast('Filtro limpiado');
+}
+document.getElementById('fTipo').onchange=function(){poblarFiltroCat();movPage=1;renderTabla();};
+['fCat','fDesde','fHasta'].forEach(id=>document.getElementById(id).onchange=()=>{movPage=1;renderTabla();});
+document.getElementById('fTxt').oninput=()=>{movPage=1;renderTabla();};
+
+/* ---------- EDITAR / BORRAR MOVIMIENTO ---------- */
+function editMov(id){
+  const m=movimientos.find(x=>x.id===id);if(!m)return;
+  const co=catsDe(m.tipo).map(c=>`<option value="${esc(c)}"${c===m.cat?' selected':''}>${esc(c)}</option>`).join('');
+  document.getElementById('modalContainer').innerHTML=`<div class="modal-bg" id="mb" onclick="if(event.target.id==='mb')cerrar()"><div class="modal">
+    <div class="modal-title"><i class="ti ti-edit"></i> Editar movimiento</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Tipo</label><select id="eTipo" onchange="poblarCat(document.getElementById('eCat'),this.value)"><option${m.tipo==='Gasto'?' selected':''}>Gasto</option><option${m.tipo==='Ingreso'?' selected':''}>Ingreso</option></select></div>
+      <div class="form-group"><label>Fecha</label><input type="date" id="eFecha" value="${fmtFecha(m.fecha)}"></div>
+      <div class="form-group fg-full"><label>Proveedor</label><input type="text" id="eProv" maxlength="80" value="${esc(m.proveedor)}"></div>
+      <div class="form-group fg-full"><label>Descripción</label><input type="text" id="eDesc" maxlength="120" value="${esc(m.desc)}"></div>
+      <div class="form-group"><label>Categoría</label><select id="eCat">${co}</select></div>
+      <div class="form-group"><label>Importe (€)</label><input type="number" id="eImp" value="${m.importe}" step="0.01"></div>
+      <div class="form-group"><label>Pago</label><select id="ePago"><option${m.pago==='tarjeta'?' selected':''}>tarjeta</option><option${m.pago==='efectivo'?' selected':''}>efectivo</option><option${m.pago==='transferencia'?' selected':''}>transferencia</option></select></div>
+      <div class="form-group"><label>¿Factura?</label><select id="eFac"><option${(m.factura||'no')==='no'?' selected':''}>no</option><option${m.factura==='si'?' selected':''}>si</option></select></div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveMov(${id})"><i class="ti ti-check"></i> Guardar cambios</button></div>
+  </div></div>`;
+}
+function saveMov(id){
+  const m=movimientos.find(x=>x.id===id);if(!m)return;
+  const fp=document.getElementById('eFecha').value.split('-');
+  m.fecha=`${parseInt(fp[2])}/${parseInt(fp[1])}/${fp[0]}`;
+  m.tipo=document.getElementById('eTipo').value;m.proveedor=document.getElementById('eProv').value;m.desc=document.getElementById('eDesc').value;m.cat=document.getElementById('eCat').value;m.importe=parseFloat(document.getElementById('eImp').value)||0;m.pago=document.getElementById('ePago').value;m.factura=document.getElementById('eFac').value;
+  logAudit(`Editado movimiento #${id} (${m.proveedor}, ${eur(m.importe)} €)`);
+  guardar();cerrar();renderTabla();toast('Cambios guardados');
+}
+function delMov(id){
+  const m=movimientos.find(x=>x.id===id);
+  if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;
+  if(m)logAudit(`Eliminado movimiento #${id} (${m.proveedor}, ${eur(m.importe)} €)`);
+  movimientos=movimientos.filter(x=>x.id!==id);guardar();renderTabla();toast('Registro eliminado');
+}
+function cerrar(){document.getElementById('modalContainer').innerHTML='';}
+
+/* ---------- PROGRAMADOS ---------- */
+function vencimientosPendientes(){
+  const hoy=new Date(); const y=hoy.getFullYear(), mo=hoy.getMonth(); const mAct=mesActual();
+  const hoy0=new Date(y,mo,hoy.getDate());
+  const diasMes=new Date(y,mo+1,0).getDate();
+  return programados.filter(p=>{
+    if(p.ultimaCarga===mAct)return false;
+    const venc=new Date(y,mo,Math.min(p.dia,diasMes));
+    const diff=(venc-hoy0)/86400000;
+    return diff<=DIAS_AVISO;
+  });
+}
+function renderAvisosNuevo(){
+  const pend=vencimientosPendientes();
+  const cont=document.getElementById('avisosNuevo');
+  if(!pend.length){cont.innerHTML='';return;}
+  cont.innerHTML=pend.map(p=>`<div class="aviso-nuevo">
+    <span><i class="ti ti-bell" style="color:var(--amber-d);margin-right:6px"></i><span style="font-weight:600;color:var(--amber-d)">${esc(p.nombre)}</span> <span style="font-size:12px;color:var(--amber-d)">— vence día ${p.dia} · ${eur(p.importe)} €</span></span>
+    <button class="btn" style="font-size:12px;padding:5px 11px" onclick="cargarProg('${p.id}',this)"><i class="ti ti-check"></i> Cargar gasto</button></div>`).join('');
+}
+function renderProg(){
+  const pend=vencimientosPendientes().map(p=>p.id);
+  const soloPend=document.getElementById('soloPend')&&document.getElementById('soloPend').checked;
+  let lista=programados;
+  if(soloPend)lista=programados.filter(p=>pend.includes(p.id));
+  document.getElementById('listaProg').innerHTML=lista.length?lista.map(p=>{
+    const a=pend.includes(p.id);
+    return `<div class="prog-card${a?' alerta':''}">
+      <div class="prog-header"><div><div class="prog-nombre">${esc(p.nombre)} ${a?'<span class="alert-badge"><i class="ti ti-bell"></i> Pendiente este mes</span>':''}</div>
+      <div class="prog-meta"><span class="badge bc">${esc(p.cat)}</span> · día ${p.dia} de cada mes · ${esc(p.pago)}${p.ultimaCarga===mesActual()?' · ya cargado este mes':''}</div></div>
+      <div class="prog-importe">${eur(p.importe)} €</div></div>
+      <div class="prog-actions">
+        <button class="btn" style="font-size:12px;padding:5px 11px"${p.ultimaCarga===mesActual()?' disabled':''} onclick="cargarProg('${p.id}',this)"><i class="ti ti-check"></i> Cargar como gasto</button>
+        <button class="btn" style="font-size:12px;padding:5px 11px" onclick="editProg('${p.id}')"><i class="ti ti-edit"></i> Editar</button>
+        <button class="btn btn-danger" style="font-size:12px;padding:5px 11px" onclick="delProg('${p.id}')"><i class="ti ti-trash"></i> Eliminar</button>
+      </div></div>`;
+  }).join(''):'<p style="color:var(--text2);font-size:13px">'+(soloPend?'No hay vencimientos pendientes este mes. 🎉':'Sin gastos programados.')+'</p>';
+}
+function cargarProg(pid,btn){
+  const p=programados.find(x=>x.id===pid);if(!p)return;
+  if(p.ultimaCarga===mesActual()){toast('Ya cargado este mes',true);return;}
+  if(btn)btn.disabled=true;
+  const h=new Date(); const diasMes=new Date(h.getFullYear(),h.getMonth()+1,0).getDate();
+  const dia=Math.min(p.dia,diasMes);
+  movimientos.push({id:nextId++,fecha:`${dia}/${h.getMonth()+1}/${h.getFullYear()}`,tipo:'Gasto',proveedor:p.nombre,cat:p.cat,desc:'Gasto programado',importe:p.importe,pago:p.pago,factura:'no'});
+  p.ultimaCarga=mesActual();
+  logAudit(`Cargado programado "${p.nombre}" (${eur(p.importe)} €)`);
+  guardar();renderAvisosNuevo();renderProg();
+  toast(`✓ "${p.nombre}" registrado: ${eur(p.importe)} €`);
+}
+function editProg(pid){
+  const p=programados.find(x=>x.id===pid);if(!p)return;
+  const co=CATS.map(c=>`<option value="${esc(c)}"${c===p.cat?' selected':''}>${esc(c)}</option>`).join('');
+  document.getElementById('modalContainer').innerHTML=`<div class="modal-bg" id="mb" onclick="if(event.target.id==='mb')cerrar()"><div class="modal">
+    <div class="modal-title"><i class="ti ti-calendar-repeat"></i> Editar gasto programado</div>
+    <div class="form-grid">
+      <div class="form-group fg-full"><label>Nombre</label><input type="text" id="epN" maxlength="60" value="${esc(p.nombre)}"></div>
+      <div class="form-group"><label>Categoría</label><select id="epC">${co}</select></div>
+      <div class="form-group"><label>Importe (€)</label><input type="number" id="epI" value="${p.importe}" step="0.01"></div>
+      <div class="form-group"><label>Día del mes</label><input type="number" id="epD" value="${p.dia}" min="1" max="31"></div>
+      <div class="form-group"><label>Pago</label><select id="epP"><option${p.pago==='tarjeta'?' selected':''}>tarjeta</option><option${p.pago==='efectivo'?' selected':''}>efectivo</option><option${p.pago==='transferencia'?' selected':''}>transferencia</option></select></div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveProg('${pid}')"><i class="ti ti-check"></i> Guardar</button></div>
+  </div></div>`;
+}
+function saveProg(pid){
+  const p=programados.find(x=>x.id===pid);if(!p)return;
+  p.nombre=document.getElementById('epN').value;p.cat=document.getElementById('epC').value;p.importe=parseFloat(document.getElementById('epI').value)||0;p.dia=parseInt(document.getElementById('epD').value)||1;p.pago=document.getElementById('epP').value;
+  guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado actualizado');
+}
+function delProg(pid){if(!confirm('¿Eliminar este gasto programado?'))return;programados=programados.filter(x=>x.id!==pid);guardar();renderProg();renderAvisosNuevo();toast('Programado eliminado');}
+function abrirModalProg(){
+  const co=CATS.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  document.getElementById('modalContainer').innerHTML=`<div class="modal-bg" id="mb" onclick="if(event.target.id==='mb')cerrar()"><div class="modal">
+    <div class="modal-title"><i class="ti ti-plus"></i> Nuevo gasto programado</div>
+    <div class="form-grid">
+      <div class="form-group fg-full"><label>Nombre</label><input type="text" id="npN" maxlength="60" placeholder="Ej: Préstamo Abanca"></div>
+      <div class="form-group"><label>Categoría</label><select id="npC">${co}</select></div>
+      <div class="form-group"><label>Importe (€)</label><input type="number" id="npI" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Día del mes</label><input type="number" id="npD" value="1" min="1" max="31"></div>
+      <div class="form-group"><label>Pago</label><select id="npP"><option>tarjeta</option><option>efectivo</option><option selected>transferencia</option></select></div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveNewProg()"><i class="ti ti-check"></i> Guardar</button></div>
+  </div></div>`;
+}
+function saveNewProg(){
+  const n=document.getElementById('npN').value.trim(),i=parseFloat(document.getElementById('npI').value)||0;
+  if(!n||!i){alert('Rellena nombre e importe');return;}
+  programados.push({id:'p'+Date.now(),nombre:n,cat:document.getElementById('npC').value,importe:i,dia:parseInt(document.getElementById('npD').value)||1,pago:document.getElementById('npP').value,ultimaCarga:''});
+  guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado añadido');
+}
+
+/* ---------- NUEVO + AUTOCOMPLETE ---------- */
+document.getElementById('nTipo').onchange=function(){poblarCat(document.getElementById('nCat'),this.value);};
+const acInput=document.getElementById('nProv'), acList=document.getElementById('acProv'); let acIdx=-1;
+acInput.addEventListener('input',()=>{
+  const v=acInput.value.toLowerCase().trim(); acIdx=-1;
+  if(!v){acList.style.display='none';return;}
+  const provs=[...new Set(movimientos.map(m=>m.proveedor))].filter(p=>p.toLowerCase().includes(v)).slice(0,6);
+  if(!provs.length){acList.style.display='none';return;}
+  acList.innerHTML=provs.map((p,i)=>`<div class="ac-item" data-i="${i}" onclick="selAC('${esc(p).replace(/'/g,"\\'")}')">${esc(p)}</div>`).join('');
+  acList.style.display='block';
+});
+acInput.addEventListener('keydown',e=>{
+  const items=acList.querySelectorAll('.ac-item');if(!items.length||acList.style.display==='none')return;
+  if(e.key==='ArrowDown'){e.preventDefault();acIdx=Math.min(acIdx+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();acIdx=Math.max(acIdx-1,0);}
+  else if(e.key==='Enter'&&acIdx>=0){e.preventDefault();items[acIdx].click();return;}
+  else if(e.key==='Escape'){acList.style.display='none';return;}
+  items.forEach((it,i)=>it.classList.toggle('sel',i===acIdx));
+});
+acInput.addEventListener('blur',()=>setTimeout(()=>acList.style.display='none',150));
+function selAC(p){acInput.value=p;acList.style.display='none';
+  // autocompletar categoría más usada con ese proveedor
+  const ult=movimientos.filter(m=>m.proveedor===p).slice(-1)[0];
+  if(ult){const cs=document.getElementById('nCat');if([...cs.options].some(o=>o.value===ult.cat))cs.value=ult.cat;}
+}
+function guardarMov(){
+  const tipo=document.getElementById('nTipo').value,fv=document.getElementById('nFecha').value,prov=document.getElementById('nProv').value.trim(),desc=document.getElementById('nDesc').value.trim(),cat=document.getElementById('nCat').value,imp=parseFloat(document.getElementById('nImp').value),pago=document.getElementById('nPago').value,fac=document.getElementById('nFac').value;
+  if(!prov||!imp||!fv){toast('Rellena fecha, proveedor e importe',true);return;}
+  if(imp<=0){toast('El importe debe ser mayor que 0',true);return;}
+  const p=fv.split('-');
+  movimientos.push({id:nextId++,fecha:`${parseInt(p[2])}/${parseInt(p[1])}/${p[0]}`,tipo,proveedor:prov,cat,desc,importe:imp,pago,factura:fac});
+  logAudit(`Nuevo ${tipo}: ${prov} (${eur(imp)} €)`);
+  guardar();
+  document.getElementById('nProv').value='';document.getElementById('nDesc').value='';document.getElementById('nImp').value='';
+  const m=document.getElementById('msgOk');m.style.display='block';setTimeout(()=>m.style.display='none',3000);
+  toast('Movimiento guardado');
+}
+
+/* ---------- CATEGORIAS ---------- */
+function renderCats(){
+  const fila=(c,tipo)=>`<div class="cat-row"><span class="cat-name">${esc(c)}</span><span style="display:flex;gap:5px">
+    <button class="icon-btn" onclick="editCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-edit"></i></button>
+    <button class="icon-btn btn-danger" onclick="delCat('${tipo}','${esc(c).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></span></div>`;
+  document.getElementById('listaCatGasto').innerHTML=CATS_GASTO.map(c=>fila(c,'gasto')).join('')||'<p style="font-size:12px;color:var(--text2)">Sin categorías.</p>';
+  document.getElementById('listaCatIngreso').innerHTML=CATS_INGRESO.map(c=>fila(c,'ingreso')).join('')||'<p style="font-size:12px;color:var(--text2)">Sin categorías.</p>';
+}
+function abrirModalCat(){
+  document.getElementById('modalContainer').innerHTML=`<div class="modal-bg" id="mb" onclick="if(event.target.id==='mb')cerrar()"><div class="modal">
+    <div class="modal-title"><i class="ti ti-tag"></i> Nueva categoría</div>
+    <div class="form-grid">
+      <div class="form-group"><label>Tipo</label><select id="ncTipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+      <div class="form-group"><label>Nombre</label><input type="text" id="ncNom" maxlength="40" placeholder="Ej: amarres"></div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveNewCat()"><i class="ti ti-check"></i> Crear</button></div>
+  </div></div>`;
+}
+function saveNewCat(){
+  const tipo=document.getElementById('ncTipo').value, nom=document.getElementById('ncNom').value.trim();
+  if(!nom){alert('Escribe un nombre');return;}
+  const arr=tipo==='ingreso'?CATS_INGRESO:CATS_GASTO;
+  if(CATS_GASTO.includes(nom)||CATS_INGRESO.includes(nom)){alert('Esa categoría ya existe');return;}
+  arr.push(nom);recomputarCats();guardar();cerrar();renderCats();toast('Categoría creada');
+}
+function editCat(tipo,nombre){
+  const nuevo=prompt('Nuevo nombre para la categoría:',nombre);
+  if(nuevo===null)return;
+  const n=nuevo.trim(); if(!n){alert('Nombre vacío');return;}
+  if(n===nombre)return;
+  if(CATS_GASTO.includes(n)||CATS_INGRESO.includes(n)){alert('Ya existe una categoría con ese nombre');return;}
+  const arr=tipo==='ingreso'?CATS_INGRESO:CATS_GASTO;
+  const idx=arr.indexOf(nombre); if(idx<0)return;
+  arr[idx]=n;
+  movimientos.forEach(m=>{if(m.cat===nombre)m.cat=n;});
+  programados.forEach(p=>{if(p.cat===nombre)p.cat=n;});
+  recomputarCats();guardar();renderCats();toast('Categoría renombrada y registros actualizados');
+}
+function delCat(tipo,nombre){
+  const enUso=movimientos.filter(m=>m.cat===nombre).length;
+  const arr=tipo==='ingreso'?CATS_INGRESO:CATS_GASTO;
+  if(arr.length<=1){alert('Debe quedar al menos una categoría de este tipo.');return;}
+  let destino=arr.find(c=>c!==nombre); // siempre una categoría existente del mismo tipo
+  if(enUso>0){
+    if(!confirm(`Hay ${enUso} registro(s) en "${nombre}". Si la borras, pasarán a "${destino}". ¿Continuar?`))return;
+    movimientos.forEach(m=>{if(m.cat===nombre)m.cat=destino;});
+    programados.forEach(p=>{if(p.cat===nombre)p.cat=destino;});
+  } else {
+    if(!confirm(`¿Borrar la categoría "${nombre}"?`))return;
+  }
+  const idx=arr.indexOf(nombre); if(idx>=0)arr.splice(idx,1);
+  recomputarCats();guardar();renderCats();toast('Categoría eliminada');
+}
+
+/* ---------- EXPORTAR / IMPORTAR ---------- */
+function listaACSV(lista){
+  const h='Fecha,Tipo,Proveedor,Categoria,Descripcion,Importe,Pago,Factura';
+  const rows=lista.map(m=>`${m.fecha},${m.tipo},"${(m.proveedor||'').replace(/"/g,'""')}","${m.cat}","${(m.desc||'').replace(/"/g,'""')}",${m.importe},${m.pago},${m.factura||'no'}`);
+  return '﻿'+[h,...rows].join('\n');
+}
+function bajarCSV(csv,nombre){
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nombre;a.click();
+}
+function exportarTodoCSV(){bajarCSV(listaACSV(movimientos),'mexicontas_todo.csv');toast('CSV exportado');}
+function exportarExcel(){
+  const datos=movimientos.map(m=>({Fecha:m.fecha,Tipo:m.tipo,Proveedor:m.proveedor,Categoría:m.cat,Descripción:m.desc,'Importe €':m.importe,Pago:m.pago,Factura:m.factura||'no'}));
+  const totG=movimientos.filter(m=>m.tipo==='Gasto').reduce((s,m)=>s+m.importe,0);
+  const totI=movimientos.filter(m=>m.tipo==='Ingreso').reduce((s,m)=>s+m.importe,0);
+  datos.push({},{Fecha:'TOTALES',Tipo:'',Proveedor:'',Categoría:'',Descripción:'Ingresos',' Importe €':''});
+  const ws=XLSX.utils.json_to_sheet(movimientos.map(m=>({Fecha:m.fecha,Tipo:m.tipo,Proveedor:m.proveedor,Categoría:m.cat,Descripción:m.desc,'Importe €':m.importe,Pago:m.pago,Factura:m.factura||'no'})));
+  XLSX.utils.sheet_add_aoa(ws,[[],['TOTALES'],['Ingresos',totI],['Gastos',totG],['Resultado',totI-totG]],{origin:-1});
+  ws['!cols']=[{wch:12},{wch:9},{wch:24},{wch:28},{wch:26},{wch:11},{wch:13},{wch:8}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Movimientos');
+  XLSX.writeFile(wb,'mexicontas.xlsx');toast('Excel exportado');
+}
+function descargarMovFiltrados(){
+  if(!movFiltrados.length){toast('No hay movimientos en el resultado actual.',true);return;}
+  bajarCSV(listaACSV(movFiltrados),'mexicontas_filtrado.csv');toast(`${movFiltrados.length} registros exportados`);
+}
+function descargarResumen(){
+  const datos=rangoResumen();
+  if(!datos.length){toast('No hay datos en el periodo seleccionado.',true);return;}
+  const d=document.getElementById('rDesde').value||'inicio', h=document.getElementById('rHasta').value||'fin';
+  bajarCSV(listaACSV(datos),`mexicontas_informe_${d}_a_${h}.csv`);
+  toast(`Informe del periodo exportado (${datos.length} registros)`);
+}
+function normalizaFila(obj){
+  const k={};
+  Object.keys(obj).forEach(key=>{
+    const kn=String(key).toLowerCase().trim().replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i').replace(/[óòö]/g,'o').replace(/[úùü]/g,'u');
+    k[kn]=obj[key];
+  });
+  const get=(...nombres)=>{for(const n of nombres){if(k[n]!==undefined&&k[n]!=='')return k[n];}return '';};
+  let fecha=get('fecha','marca temporal','date');
+  if(fecha instanceof Date)fecha=`${fecha.getDate()}/${fecha.getMonth()+1}/${fecha.getFullYear()}`;
+  else if(typeof fecha==='number'){const dd=XLSX.SSF.parse_date_code(fecha);if(dd)fecha=`${dd.d}/${dd.m}/${dd.y}`;}
+  else fecha=String(fecha).split(' ')[0].replace(/-/g,'/');
+  let importe=get('importe','gasto €','gasto','importe €','cantidad','total');
+  importe=parseFloat(String(importe).replace(/[^0-9.,-]/g,'').replace(',','.'))||0;
+  let tipo=String(get('tipo')).trim();
+  tipo=tipo?(tipo.toLowerCase().includes('ingr')?'Ingreso':'Gasto'):'Gasto';
+  let cat=String(get('categoria','categoría','concepto','categoria gasto')).trim();
+  if(!cat)cat=tipo==='Ingreso'?(CATS_INGRESO[0]||'Mejillón'):'otros';
+  return {
+    fecha:fecha||'1/1/2026', tipo,
+    proveedor:String(get('proveedor','concepto / proveedor','concepto','cliente','nombre')||'Sin nombre').trim(),
+    cat,
+    desc:String(get('descripcion','descripción','detalle','concepto/cliente')||'').trim(),
+    importe,
+    pago:String(get('pago','metodo de pago','método de pago','forma de cobro','forma de pago')||'transferencia').trim().toLowerCase(),
+    factura:String(get('factura','¿factura?')||'no').trim().toLowerCase().includes('s')?'si':'no'
+  };
+}
+function procesarFilas(filas){
+  if(!filas.length){toast('El archivo no contiene filas válidas.',true);return;}
+  let descartadas=0;
+  let candidatos=filas.map(normalizaFila).filter(m=>{if(m.importe>0)return true;descartadas++;return false;});
+  // detección de duplicados (fecha+proveedor+importe ya existente)
+  const existentes=new Set(movimientos.map(m=>`${m.fecha}|${m.proveedor.toLowerCase()}|${m.importe}`));
+  let dup=0;
+  const nuevos=candidatos.filter(m=>{const key=`${m.fecha}|${m.proveedor.toLowerCase()}|${m.importe}`;if(existentes.has(key)){dup++;return false;}existentes.add(key);return true;});
+  if(!nuevos.length){toast(`No se importó nada. ${dup} duplicado(s), ${descartadas} sin importe válido.`,true);return;}
+  let msg=`Se importarán ${nuevos.length} registros.`;
+  if(dup)msg+=`\n• ${dup} duplicado(s) omitido(s).`;
+  if(descartadas)msg+=`\n• ${descartadas} fila(s) sin importe válido descartada(s).`;
+  msg+='\n\n¿Continuar?';
+  if(!confirm(msg))return;
+  nuevos.forEach(m=>m.id=nextId++);
+  movimientos=movimientos.concat(nuevos);
+  logAudit(`Importados ${nuevos.length} registros`);
+  guardar();poblarFiltroCat();buildCharts();renderTabla();
+  toast(`✓ ${nuevos.length} registros importados`);
+}
+function importarArchivo(ev){
+  const file=ev.target.files[0]; if(!file)return;
+  showOverlay('Importando archivo…');
+  const reader=new FileReader(); const esCSV=file.name.toLowerCase().endsWith('.csv');
+  reader.onload=e=>{
+    try{
+      const wb=esCSV?XLSX.read(e.target.result,{type:'string'}):XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const filas=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      hideOverlay();
+      procesarFilas(filas);
+    }catch(err){hideOverlay();toast('Error al leer el archivo: '+err.message,true);}
+    ev.target.value='';
+  };
+  reader.onerror=()=>{hideOverlay();toast('No se pudo leer el archivo',true);};
+  if(esCSV)reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file);
+}
+function resetDatos(){
+  if(!confirm('¿Reiniciar a los datos originales? Se perderán los cambios (no afecta al PIN).'))return;
+  movimientos=JSON.parse(JSON.stringify(ORIGINAL));programados=JSON.parse(JSON.stringify(PROG_ORIG));
+  CATS_GASTO=[...CATS_GASTO_DEF];CATS_INGRESO=[...CATS_INGRESO_DEF];recomputarCats();nextId=200;
+  logAudit('Datos reiniciados a originales');
+  guardar();poblarFiltroCat();buildCharts();renderTabla();renderProg();renderCats();renderAvisosNuevo();toast('Datos reiniciados');
+}
+function renderAudit(){
+  document.getElementById('auditLog').innerHTML=auditoria.length?auditoria.slice().reverse().slice(0,40).map(a=>`<div><span style="color:var(--text3)">${esc(a.t)}</span> — ${esc(a.a)}</div>`).join(''):'<span style="color:var(--text3)">Sin actividad registrada.</span>';
+}
+
+/* ---------- ARRANQUE ---------- */
+async function arrancarApp(){
+  if(window._arrancado)return; window._arrancado=true;
+  initSB();
+  if(syncCode){ showOverlay('Descargando de la nube…'); try{await bajarNube();}catch(e){} hideOverlay(); }
+  else cargar();
+  // estados de toggles
+  document.getElementById('autoLock').checked=localStorage.getItem('marea_autolock')==='1';
+  document.getElementById('notifPerm').checked=localStorage.getItem('marea_notif')==='1';
+  if(syncCode)document.getElementById('syncCode').value=syncCode;
+  poblarFiltroCat();
+  poblarCat(document.getElementById('nCat'),document.getElementById('nTipo').value);
+  document.getElementById('nFecha').value=new Date().toISOString().split('T')[0];
+  buildCharts();
+  renderTabla();
+  renderAvisosNuevo();
+  resetIdle();
+  avisarVencimientos();
+}
+function cargarPrimero(){ if(!syncCode)cargar(); }
+cargar(); // carga local inmediata (se sobreescribe si hay sync)
+initPin();
+</script>
+</body>
+</html>

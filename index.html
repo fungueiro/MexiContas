@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MexiContas">
-<link rel="apple-touch-icon" href="icon-192.png">
 <title>MexiContas — Ingresos y gastos</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none' stroke='%231D9E75' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='8.5' width='25' height='4.5' rx='1'/%3E%3Cline x1='9.5' y1='8.5' x2='9.5' y2='13'/%3E%3Cline x1='16' y1='8.5' x2='16' y2='13'/%3E%3Cline x1='22.5' y1='8.5' x2='22.5' y2='13'/%3E%3Cline x1='7' y1='13' x2='7' y2='25'/%3E%3Cline x1='12.5' y1='13' x2='12.5' y2='27'/%3E%3Cline x1='19' y1='13' x2='19' y2='24.5'/%3E%3Cline x1='25' y1='13' x2='25' y2='26'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
@@ -420,6 +419,8 @@ button.icon-btn.btn-danger:hover{background:var(--red);color:#fff}
 
 <script>
 const DIAS_AVISO=5;
+const FREC_MESES={mensual:1,bimestral:2,trimestral:3,semestral:6,anual:12};
+const FREC_LABEL={mensual:'mensual',bimestral:'bimestral',trimestral:'trimestral',semestral:'semestral',anual:'anual'};
 const SB_URL='https://cfqlattwvyvtakkyznpb.supabase.co';
 const SB_KEY='sb_publishable_oL4fvXIZd6bn76MqqX6l5Q_0FDcv8X8';
 const CATS_GASTO_DEF=['combustible coche','vehículo (seguros, peajes, reparaciones)','combustible barco','mantenimiento barco','suministros explotación','galpón (alquiler, suministros)','gestoría / asesoría','seguridad social','sueldos y nóminas','créditos y financieros','seguros','impuestos','asociaciones (Aspromeri)','dietas y comidas','otros'];
@@ -570,13 +571,13 @@ const ORIGINAL=[
 ];
 
 const PROG_ORIG=[
-{id:'p1',nombre:'Préstamo barco (Abanca)',cat:'créditos y financieros',importe:1614,dia:1,pago:'transferencia',ultimaCarga:''},
-{id:'p2',nombre:'Intereses póliza (Sabadell)',cat:'créditos y financieros',importe:130,dia:7,pago:'transferencia',ultimaCarga:''},
-{id:'p3',nombre:'Seguridad Social trabajadores',cat:'seguridad social',importe:888,dia:28,pago:'transferencia',ultimaCarga:''},
-{id:'p4',nombre:'Nómina Parada',cat:'sueldos y nóminas',importe:1517,dia:30,pago:'transferencia',ultimaCarga:''},
-{id:'p5',nombre:'Asesoría Asemar',cat:'gestoría / asesoría',importe:152,dia:1,pago:'transferencia',ultimaCarga:''},
-{id:'p6',nombre:'Alquiler + suministros Portos',cat:'galpón (alquiler, suministros)',importe:700,dia:15,pago:'transferencia',ultimaCarga:''},
-{id:'p7',nombre:'Seguro o Barreiras',cat:'seguros',importe:506.65,dia:4,pago:'transferencia',ultimaCarga:''}
+{id:'p1',nombre:'Préstamo barco (Abanca)',cat:'créditos y financieros',importe:1614,dia:1,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p2',nombre:'Intereses póliza (Sabadell)',cat:'créditos y financieros',importe:130,dia:7,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p3',nombre:'Seguridad Social trabajadores',cat:'seguridad social',importe:888,dia:28,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p4',nombre:'Nómina Parada',cat:'sueldos y nóminas',importe:1517,dia:30,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p5',nombre:'Asesoría Asemar',cat:'gestoría / asesoría',importe:152,dia:1,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p6',nombre:'Alquiler + suministros Portos',cat:'galpón (alquiler, suministros)',importe:700,dia:15,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'},
+{id:'p7',nombre:'Seguro o Barreiras',cat:'seguros',importe:506.65,dia:4,pago:'transferencia',ultimaCarga:'',frecuencia:'mensual'}
 ];
 
 let movimientos=[], programados=[], nextId=200, movFiltrados=[];
@@ -600,7 +601,7 @@ function cargar(){
     movimientos=JSON.parse(JSON.stringify(ORIGINAL));
     programados=JSON.parse(JSON.stringify(PROG_ORIG));
   }
-  programados.forEach(p=>{if(p.ultimaCarga===undefined)p.ultimaCarga='';});
+  programados.forEach(p=>{if(p.ultimaCarga===undefined)p.ultimaCarga='';if(!p.frecuencia)p.frecuencia='mensual';});
   recomputarCats();
 }
 function guardar(){
@@ -668,7 +669,7 @@ async function subirNubeNow(){
     }
     await sb.from('programados').delete().eq('device_id',syncCode);
     if(programados.length){
-      await sb.from('programados').upsert(programados.map(p=>({id:p.id,device_id:syncCode,nombre:p.nombre,cat:p.cat,importe:p.importe,dia:p.dia,pago:p.pago,ultima_carga:p.ultimaCarga})));
+      await sb.from('programados').upsert(programados.map(p=>({id:p.id,device_id:syncCode,nombre:p.nombre,cat:p.cat,importe:p.importe,dia:p.dia,pago:p.pago,ultima_carga:p.ultimaCarga,frecuencia:p.frecuencia||'mensual'})));
     }
     await sb.from('config_app').upsert([
       {key:'catg',device_id:syncCode,value:JSON.stringify(CATS_GASTO)},
@@ -685,7 +686,7 @@ async function bajarNube(){
   const {data:pr}=await sb.from('programados').select('*').eq('device_id',syncCode);
   const {data:cf}=await sb.from('config_app').select('*').eq('device_id',syncCode);
   if(mv)movimientos=mv.map(m=>({id:m.id,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,desc:m.descripcion,importe:Number(m.importe),pago:m.pago,factura:m.factura}));
-  if(pr)programados=pr.map(p=>({id:p.id,nombre:p.nombre,cat:p.cat,importe:Number(p.importe),dia:p.dia,pago:p.pago,ultimaCarga:p.ultima_carga||''}));
+  if(pr)programados=pr.map(p=>({id:p.id,nombre:p.nombre,cat:p.cat,importe:Number(p.importe),dia:p.dia,pago:p.pago,ultimaCarga:p.ultima_carga||'',frecuencia:p.frecuencia||'mensual'}));
   if(cf){cf.forEach(c=>{ if(c.key==='catg')CATS_GASTO=JSON.parse(c.value); if(c.key==='cati')CATS_INGRESO=JSON.parse(c.value); if(c.key==='nextid')nextId=parseInt(c.value)||200; });}
   recomputarCats();
   localStorage.setItem('marea_mov',JSON.stringify(movimientos));
@@ -710,6 +711,8 @@ function toDate(f){
 function agrupa(s){return String(s).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
 function eur(n){const neg=Number(n)<0;const x=Math.abs(Number(n)).toFixed(2).split('.');return (neg?'-':'')+agrupa(x[0])+','+x[1];}
 function mesActual(){const h=new Date();return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}`;}
+function mesesDesde(ym){if(!ym)return 999;const[y,m]=ym.split('-').map(Number);const h=new Date();return(h.getFullYear()-y)*12+(h.getMonth()+1-m);}
+function yaRecargado(p){return mesesDesde(p.ultimaCarga)<(FREC_MESES[p.frecuencia||'mensual']||1);}
 async function sha256(txt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(txt));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function animarMetrica(id,valor){
   const el=document.getElementById(id), prev=parseFloat(el.dataset.eur)||0;
@@ -956,11 +959,11 @@ function cerrar(){document.getElementById('modalContainer').innerHTML='';}
 
 /* ---------- PROGRAMADOS ---------- */
 function vencimientosPendientes(){
-  const hoy=new Date(); const y=hoy.getFullYear(), mo=hoy.getMonth(); const mAct=mesActual();
+  const hoy=new Date(); const y=hoy.getFullYear(), mo=hoy.getMonth();
   const hoy0=new Date(y,mo,hoy.getDate());
   const diasMes=new Date(y,mo+1,0).getDate();
   return programados.filter(p=>{
-    if(p.ultimaCarga===mAct)return false;
+    if(yaRecargado(p))return false;
     const venc=new Date(y,mo,Math.min(p.dia,diasMes));
     const diff=(venc-hoy0)/86400000;
     return diff<=DIAS_AVISO;
@@ -983,10 +986,10 @@ function renderProg(){
     const a=pend.includes(p.id);
     return `<div class="prog-card${a?' alerta':''}">
       <div class="prog-header"><div><div class="prog-nombre">${esc(p.nombre)} ${a?'<span class="alert-badge"><i class="ti ti-bell"></i> Pendiente este mes</span>':''}</div>
-      <div class="prog-meta"><span class="badge bc">${esc(p.cat)}</span> · día ${p.dia} de cada mes · ${esc(p.pago)}${p.ultimaCarga===mesActual()?' · ya cargado este mes':''}</div></div>
+      <div class="prog-meta"><span class="badge bc">${esc(p.cat)}</span> · día ${p.dia} · ${FREC_LABEL[p.frecuencia||'mensual']} · ${esc(p.pago)}${yaRecargado(p)?' · ya cargado':''}</div></div>
       <div class="prog-importe">${eur(p.importe)} €</div></div>
       <div class="prog-actions">
-        <button class="btn" style="font-size:12px;padding:5px 11px"${p.ultimaCarga===mesActual()?' disabled':''} onclick="cargarProg('${p.id}',this)"><i class="ti ti-check"></i> Cargar como gasto</button>
+        <button class="btn" style="font-size:12px;padding:5px 11px"${yaRecargado(p)?' disabled':''} onclick="cargarProg('${p.id}',this)"><i class="ti ti-check"></i> Cargar como gasto</button>
         <button class="btn" style="font-size:12px;padding:5px 11px" onclick="editProg('${p.id}')"><i class="ti ti-edit"></i> Editar</button>
         <button class="btn btn-danger" style="font-size:12px;padding:5px 11px" onclick="delProg('${p.id}')"><i class="ti ti-trash"></i> Eliminar</button>
       </div></div>`;
@@ -994,7 +997,7 @@ function renderProg(){
 }
 function cargarProg(pid,btn){
   const p=programados.find(x=>x.id===pid);if(!p)return;
-  if(p.ultimaCarga===mesActual()){toast('Ya cargado este mes',true);return;}
+  if(yaRecargado(p)){toast('Ya cargado recientemente',true);return;}
   if(btn)btn.disabled=true;
   const h=new Date(); const diasMes=new Date(h.getFullYear(),h.getMonth()+1,0).getDate();
   const dia=Math.min(p.dia,diasMes);
@@ -1014,6 +1017,7 @@ function editProg(pid){
       <div class="form-group"><label>Categoría</label><select id="epC">${co}</select></div>
       <div class="form-group"><label>Importe (€)</label><input type="number" id="epI" value="${p.importe}" step="0.01"></div>
       <div class="form-group"><label>Día del mes</label><input type="number" id="epD" value="${p.dia}" min="1" max="31"></div>
+      <div class="form-group"><label>Periodicidad</label><select id="epF"><option value="mensual"${(p.frecuencia||'mensual')==='mensual'?' selected':''}>Mensual</option><option value="bimestral"${p.frecuencia==='bimestral'?' selected':''}>Bimestral (cada 2 meses)</option><option value="trimestral"${p.frecuencia==='trimestral'?' selected':''}>Trimestral (cada 3 meses)</option><option value="semestral"${p.frecuencia==='semestral'?' selected':''}>Semestral (cada 6 meses)</option><option value="anual"${p.frecuencia==='anual'?' selected':''}>Anual</option></select></div>
       <div class="form-group"><label>Pago</label><select id="epP"><option${p.pago==='tarjeta'?' selected':''}>tarjeta</option><option${p.pago==='efectivo'?' selected':''}>efectivo</option><option${p.pago==='transferencia'?' selected':''}>transferencia</option></select></div>
     </div>
     <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveProg('${pid}')"><i class="ti ti-check"></i> Guardar</button></div>
@@ -1021,7 +1025,7 @@ function editProg(pid){
 }
 function saveProg(pid){
   const p=programados.find(x=>x.id===pid);if(!p)return;
-  p.nombre=document.getElementById('epN').value;p.cat=document.getElementById('epC').value;p.importe=parseFloat(document.getElementById('epI').value)||0;p.dia=parseInt(document.getElementById('epD').value)||1;p.pago=document.getElementById('epP').value;
+  p.nombre=document.getElementById('epN').value;p.cat=document.getElementById('epC').value;p.importe=parseFloat(document.getElementById('epI').value)||0;p.dia=parseInt(document.getElementById('epD').value)||1;p.frecuencia=document.getElementById('epF').value;p.pago=document.getElementById('epP').value;
   guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado actualizado');
 }
 function delProg(pid){if(!confirm('¿Eliminar este gasto programado?'))return;programados=programados.filter(x=>x.id!==pid);guardar();renderProg();renderAvisosNuevo();toast('Programado eliminado');}
@@ -1034,6 +1038,7 @@ function abrirModalProg(){
       <div class="form-group"><label>Categoría</label><select id="npC">${co}</select></div>
       <div class="form-group"><label>Importe (€)</label><input type="number" id="npI" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>Día del mes</label><input type="number" id="npD" value="1" min="1" max="31"></div>
+      <div class="form-group"><label>Periodicidad</label><select id="npF"><option value="mensual" selected>Mensual</option><option value="bimestral">Bimestral (cada 2 meses)</option><option value="trimestral">Trimestral (cada 3 meses)</option><option value="semestral">Semestral (cada 6 meses)</option><option value="anual">Anual</option></select></div>
       <div class="form-group"><label>Pago</label><select id="npP"><option>tarjeta</option><option>efectivo</option><option selected>transferencia</option></select></div>
     </div>
     <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveNewProg()"><i class="ti ti-check"></i> Guardar</button></div>
@@ -1042,7 +1047,7 @@ function abrirModalProg(){
 function saveNewProg(){
   const n=document.getElementById('npN').value.trim(),i=parseFloat(document.getElementById('npI').value)||0;
   if(!n||!i){alert('Rellena nombre e importe');return;}
-  programados.push({id:'p'+Date.now(),nombre:n,cat:document.getElementById('npC').value,importe:i,dia:parseInt(document.getElementById('npD').value)||1,pago:document.getElementById('npP').value,ultimaCarga:''});
+  programados.push({id:'p'+Date.now(),nombre:n,cat:document.getElementById('npC').value,importe:i,dia:parseInt(document.getElementById('npD').value)||1,frecuencia:document.getElementById('npF').value,pago:document.getElementById('npP').value,ultimaCarga:''});
   guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado añadido');
 }
 

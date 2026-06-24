@@ -1,4 +1,4 @@
-const CACHE = 'mexicontas-v1';
+const CACHE = 'mexicontas-v2';
 const ASSETS = [
   './',
   './index.html',

@@ -369,13 +369,14 @@ button.icon-btn.btn-danger:hover{background:var(--red);color:#fff}
 <div class="section" id="sec-datos">
   <div class="card" style="max-width:580px;margin:0 auto">
     <div class="card-title" style="margin-bottom:14px">Sincronización en la nube</div>
-    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Conecta tus datos a la nube (Supabase) para no perderlos si cambias de dispositivo o borras el navegador. Usa un código de sincronización para acceder a los mismos datos desde cualquier sitio.</p>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Conecta tus datos a la nube (Supabase) para no perderlos si cambias de dispositivo o borras el navegador. Usa un código de sincronización para acceder a los mismos datos desde cualquier sitio. La sincronización <strong>combina</strong> los datos (nunca borra los de un lado para poner los del otro).</p>
     <div style="display:flex;flex-direction:column;gap:9px">
       <div class="form-group"><label>Código de sincronización (tu cuenta)</label><input type="text" id="syncCode" placeholder="ej: mexillon-2026" maxlength="40"></div>
       <button class="btn btn-primary" style="justify-content:center" onclick="activarSync()"><i class="ti ti-cloud-upload"></i> Activar sincronización en la nube</button>
       <button class="btn" style="justify-content:center" onclick="desactivarSync()"><i class="ti ti-cloud-off"></i> Trabajar solo en local</button>
+      <button class="btn" style="justify-content:center" onclick="restaurarBackup()"><i class="ti ti-history"></i> Restaurar última copia de seguridad</button>
     </div>
-    <p style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">Usa el mismo código en otro dispositivo para ver tus datos. Manténlo privado: quien lo conozca puede ver tus cuentas.</p>
+    <p style="font-size:11px;color:var(--text2);margin-top:10px;line-height:1.6">Usa el mismo código en otro dispositivo para ver tus datos. Manténlo privado: quien lo conozca puede ver tus cuentas. Antes de cada sincronización se guarda una copia de seguridad local que puedes restaurar con el botón de arriba.</p>
   </div>
 
   <div class="card" style="max-width:580px;margin:14px auto">
@@ -585,6 +586,47 @@ let chMes,chCat,chBal;
 let sb=null, syncCode=null, syncing=false;
 let movPage=1; const PAGE_SIZE=50;
 let auditoria=[];
+let delMovIds=[], delProgIds=[]; // papelera (tombstones) para propagar borrados al sincronizar
+
+/* ---------- IDS ÚNICOS Y UTILIDADES DE FUSIÓN ---------- */
+// id único global (no choca entre dispositivos): tiempo en ms * 1000 + aleatorio
+function genId(){ return Date.now()*1000 + Math.floor(Math.random()*1000); }
+function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
+// une dos listas de papelera quedándose con la marca de borrado más reciente por id
+function mergeTomb(a,b){
+  const map=new Map();
+  [...(a||[]),...(b||[])].forEach(d=>{ if(!d)return; const k=String(d.id), t=d.t||0; if(!map.has(k)||map.get(k)<t)map.set(k,t); });
+  let arr=[...map.entries()].map(([id,t])=>({id,t}));
+  if(arr.length>1000)arr=arr.slice(-1000);
+  return arr;
+}
+// fusiona registros locales y de la nube por id: gana el de marca 'upd' mayor; aplica papelera
+function mergeRecords(local,cloud,tomb){
+  const tmap=new Map((tomb||[]).map(d=>[String(d.id),d.t||0]));
+  const byId=new Map();
+  (local||[]).forEach(r=>byId.set(String(r.id),r));
+  (cloud||[]).forEach(r=>{ const k=String(r.id),ex=byId.get(k); if(!ex||(r.upd||0)>(ex.upd||0))byId.set(k,r); });
+  const out=[];
+  byId.forEach((r,k)=>{ const dt=tmap.get(k); if(dt!==undefined&&(r.upd||0)<=dt)return; out.push(r); });
+  return out;
+}
+function unionCats(a,b){ const out=[...(a||[])]; (b||[]).forEach(c=>{ if(!out.includes(c))out.push(c); }); return out; }
+// guarda una copia de seguridad local antes de fusionar, por si hay que restaurar
+function snapshotLocal(){
+  try{ localStorage.setItem('marea_backup',JSON.stringify({t:Date.now(),mov:movimientos,prog:programados,catg:CATS_GASTO,cati:CATS_INGRESO})); }catch(e){}
+}
+function restaurarBackup(){
+  const raw=localStorage.getItem('marea_backup');
+  const b=raw?safeParse(raw):null;
+  if(!b||!b.mov){toast('No hay copia de seguridad guardada',true);return;}
+  if(!confirm('¿Restaurar la última copia de seguridad local (del '+new Date(b.t).toLocaleString('es-ES')+')? Reemplazará lo que ves ahora.'))return;
+  movimientos=b.mov; programados=b.prog||[];
+  if(b.catg)CATS_GASTO=b.catg; if(b.cati)CATS_INGRESO=b.cati;
+  programados.forEach(p=>{if(p.ultimaCarga===undefined)p.ultimaCarga='';if(!p.frecuencia)p.frecuencia='mensual';});
+  recomputarCats(); guardar();
+  poblarFiltroCat();buildCharts();renderTabla();renderProg();renderCats();renderAvisosNuevo();
+  toast('Copia de seguridad restaurada ✓');
+}
 
 /* ---------- PERSISTENCIA ---------- */
 function cargar(){
@@ -597,6 +639,8 @@ function cargar(){
     if(cg)CATS_GASTO=JSON.parse(cg);
     if(ci)CATS_INGRESO=JSON.parse(ci);
     if(au)auditoria=JSON.parse(au);
+    delMovIds=safeParse(localStorage.getItem('marea_delmov'))||[];
+    delProgIds=safeParse(localStorage.getItem('marea_delprog'))||[];
   }catch(e){
     movimientos=JSON.parse(JSON.stringify(ORIGINAL));
     programados=JSON.parse(JSON.stringify(PROG_ORIG));
@@ -612,6 +656,8 @@ function guardar(){
     localStorage.setItem('marea_catg',JSON.stringify(CATS_GASTO));
     localStorage.setItem('marea_cati',JSON.stringify(CATS_INGRESO));
     localStorage.setItem('marea_audit',JSON.stringify(auditoria.slice(-100)));
+    localStorage.setItem('marea_delmov',JSON.stringify(delMovIds));
+    localStorage.setItem('marea_delprog',JSON.stringify(delProgIds));
   }catch(e){}
   if(syncCode)subirNube();
 }
@@ -638,18 +684,15 @@ async function activarSync(){
   if(!code||code.length<4){toast('El código debe tener al menos 4 caracteres (letras, números, guiones)',true);return;}
   if(!sb){toast('No se pudo conectar con la nube',true);return;}
   syncCode=code; localStorage.setItem('marea_sync',code);
-  setSyncUI('sync'); showOverlay('Conectando con la nube…');
+  setSyncUI('sync'); showOverlay('Sincronizando con la nube…');
   try{
-    const {data}=await sb.from('movimientos').select('id').eq('device_id',code).limit(1);
-    if(data&&data.length){
-      if(confirm('Ya existen datos en la nube con ese código. ¿Descargarlos? (Reemplazará lo que ves ahora)')){
-        await bajarNube();
-      } else { await subirNube(); }
-    } else {
-      await subirNube();
-    }
+    // fusiona en ambos sentidos: combina lo de la nube con lo local y vuelve a subir el resultado.
+    // Nunca borra: si un código ya tenía datos, se conservan todos (los de aquí y los de allí).
+    await mergeNube();
+    await subirNubeNow();
     setSyncUI('on'); logAudit('Sincronización activada: '+code);
     toast('Sincronización activada ✓');
+    poblarFiltroCat();buildCharts();renderTabla();renderProg();renderCats();renderAvisosNuevo();
   }catch(e){ setSyncUI('off'); toast('Error al sincronizar: '+e.message,true); syncCode=null; localStorage.removeItem('marea_sync'); }
   hideOverlay();
 }
@@ -659,38 +702,63 @@ function desactivarSync(){
 }
 let subirTimer=null;
 function subirNube(){ clearTimeout(subirTimer); subirTimer=setTimeout(subirNubeNow,800); }
+// Sube combinando (upsert), sin borrar nada en bloque. Los borrados se propagan vía papelera.
 async function subirNubeNow(){
   if(!sb||!syncCode||syncing)return; syncing=true; setSyncUI('sync');
   try{
-    await sb.from('movimientos').delete().eq('device_id',syncCode);
     if(movimientos.length){
-      const rows=movimientos.map(m=>({id:m.id,device_id:syncCode,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,descripcion:m.desc,importe:m.importe,pago:m.pago,factura:m.factura}));
+      const rows=movimientos.map(m=>({id:m.id,device_id:syncCode,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,descripcion:m.desc,importe:m.importe,pago:m.pago,factura:m.factura,upd:m.upd||0}));
       for(let i=0;i<rows.length;i+=500){ await sb.from('movimientos').upsert(rows.slice(i,i+500)); }
     }
-    await sb.from('programados').delete().eq('device_id',syncCode);
     if(programados.length){
-      await sb.from('programados').upsert(programados.map(p=>({id:p.id,device_id:syncCode,nombre:p.nombre,cat:p.cat,importe:p.importe,dia:p.dia,pago:p.pago,ultima_carga:p.ultimaCarga,frecuencia:p.frecuencia||'mensual'})));
+      await sb.from('programados').upsert(programados.map(p=>({id:p.id,device_id:syncCode,nombre:p.nombre,cat:p.cat,importe:p.importe,dia:p.dia,pago:p.pago,ultima_carga:p.ultimaCarga,frecuencia:p.frecuencia||'mensual',upd:p.upd||0})));
     }
+    // propaga los borrados (solo los registros marcados en la papelera)
+    const dmov=delMovIds.map(d=>d.id);
+    for(let i=0;i<dmov.length;i+=200){ await sb.from('movimientos').delete().eq('device_id',syncCode).in('id',dmov.slice(i,i+200)); }
+    const dprog=delProgIds.map(d=>d.id);
+    if(dprog.length) await sb.from('programados').delete().eq('device_id',syncCode).in('id',dprog);
     await sb.from('config_app').upsert([
       {key:'catg',device_id:syncCode,value:JSON.stringify(CATS_GASTO)},
       {key:'cati',device_id:syncCode,value:JSON.stringify(CATS_INGRESO)},
-      {key:'nextid',device_id:syncCode,value:String(nextId)}
+      {key:'delmov',device_id:syncCode,value:JSON.stringify(delMovIds)},
+      {key:'delprog',device_id:syncCode,value:JSON.stringify(delProgIds)}
     ]);
     setSyncUI('on');
   }catch(e){ setSyncUI('on'); }
   syncing=false;
 }
-async function bajarNube(){
+// Baja de la nube y FUSIONA con lo local (no reemplaza). Guarda copia de seguridad antes.
+async function mergeNube(){
   if(!sb||!syncCode)return;
-  const {data:mv}=await sb.from('movimientos').select('*').eq('device_id',syncCode);
-  const {data:pr}=await sb.from('programados').select('*').eq('device_id',syncCode);
-  const {data:cf}=await sb.from('config_app').select('*').eq('device_id',syncCode);
-  if(mv)movimientos=mv.map(m=>({id:m.id,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,desc:m.descripcion,importe:Number(m.importe),pago:m.pago,factura:m.factura}));
-  if(pr)programados=pr.map(p=>({id:p.id,nombre:p.nombre,cat:p.cat,importe:Number(p.importe),dia:p.dia,pago:p.pago,ultimaCarga:p.ultima_carga||'',frecuencia:p.frecuencia||'mensual'}));
-  if(cf){cf.forEach(c=>{ if(c.key==='catg')CATS_GASTO=JSON.parse(c.value); if(c.key==='cati')CATS_INGRESO=JSON.parse(c.value); if(c.key==='nextid')nextId=parseInt(c.value)||200; });}
+  const [mvr,prr,cfr]=await Promise.all([
+    sb.from('movimientos').select('*').eq('device_id',syncCode),
+    sb.from('programados').select('*').eq('device_id',syncCode),
+    sb.from('config_app').select('*').eq('device_id',syncCode)
+  ]);
+  const mv=mvr.data, pr=prr.data, cf=cfr.data;
+  snapshotLocal();
+  let cloudCatg=null, cloudCati=null, cloudDelMov=[], cloudDelProg=[];
+  if(cf)cf.forEach(c=>{
+    if(c.key==='catg')cloudCatg=safeParse(c.value);
+    else if(c.key==='cati')cloudCati=safeParse(c.value);
+    else if(c.key==='delmov')cloudDelMov=safeParse(c.value)||[];
+    else if(c.key==='delprog')cloudDelProg=safeParse(c.value)||[];
+  });
+  delMovIds=mergeTomb(delMovIds,cloudDelMov);
+  delProgIds=mergeTomb(delProgIds,cloudDelProg);
+  const cloudMov=(mv||[]).map(m=>({id:m.id,fecha:m.fecha,tipo:m.tipo,proveedor:m.proveedor,cat:m.cat,desc:m.descripcion,importe:Number(m.importe),pago:m.pago,factura:m.factura,upd:m.upd||0}));
+  movimientos=mergeRecords(movimientos,cloudMov,delMovIds);
+  const cloudProg=(pr||[]).map(p=>({id:p.id,nombre:p.nombre,cat:p.cat,importe:Number(p.importe),dia:p.dia,pago:p.pago,ultimaCarga:p.ultima_carga||'',frecuencia:p.frecuencia||'mensual',upd:p.upd||0}));
+  programados=mergeRecords(programados,cloudProg,delProgIds);
+  if(cloudCatg)CATS_GASTO=unionCats(CATS_GASTO,cloudCatg);
+  if(cloudCati)CATS_INGRESO=unionCats(CATS_INGRESO,cloudCati);
+  programados.forEach(p=>{if(p.ultimaCarga===undefined)p.ultimaCarga='';if(!p.frecuencia)p.frecuencia='mensual';});
   recomputarCats();
   localStorage.setItem('marea_mov',JSON.stringify(movimientos));
   localStorage.setItem('marea_prog',JSON.stringify(programados));
+  localStorage.setItem('marea_delmov',JSON.stringify(delMovIds));
+  localStorage.setItem('marea_delprog',JSON.stringify(delProgIds));
 }
 
 /* ---------- UTILIDADES ---------- */
@@ -946,6 +1014,7 @@ function saveMov(id){
   const fp=document.getElementById('eFecha').value.split('-');
   m.fecha=`${parseInt(fp[2])}/${parseInt(fp[1])}/${fp[0]}`;
   m.tipo=document.getElementById('eTipo').value;m.proveedor=document.getElementById('eProv').value;m.desc=document.getElementById('eDesc').value;m.cat=document.getElementById('eCat').value;m.importe=parseFloat(document.getElementById('eImp').value)||0;m.pago=document.getElementById('ePago').value;m.factura=document.getElementById('eFac').value;
+  m.upd=Date.now();
   logAudit(`Editado movimiento #${id} (${m.proveedor}, ${eur(m.importe)} €)`);
   guardar();cerrar();renderTabla();toast('Cambios guardados');
 }
@@ -953,6 +1022,7 @@ function delMov(id){
   const m=movimientos.find(x=>x.id===id);
   if(!confirm('¿Eliminar este registro? No se puede deshacer.'))return;
   if(m)logAudit(`Eliminado movimiento #${id} (${m.proveedor}, ${eur(m.importe)} €)`);
+  delMovIds.push({id,t:Date.now()});
   movimientos=movimientos.filter(x=>x.id!==id);guardar();renderTabla();toast('Registro eliminado');
 }
 function cerrar(){document.getElementById('modalContainer').innerHTML='';}
@@ -1001,8 +1071,8 @@ function cargarProg(pid,btn){
   if(btn)btn.disabled=true;
   const h=new Date(); const diasMes=new Date(h.getFullYear(),h.getMonth()+1,0).getDate();
   const dia=Math.min(p.dia,diasMes);
-  movimientos.push({id:nextId++,fecha:`${dia}/${h.getMonth()+1}/${h.getFullYear()}`,tipo:'Gasto',proveedor:p.nombre,cat:p.cat,desc:'Gasto programado',importe:p.importe,pago:p.pago,factura:'no'});
-  p.ultimaCarga=mesActual();
+  movimientos.push({id:genId(),fecha:`${dia}/${h.getMonth()+1}/${h.getFullYear()}`,tipo:'Gasto',proveedor:p.nombre,cat:p.cat,desc:'Gasto programado',importe:p.importe,pago:p.pago,factura:'no',upd:Date.now()});
+  p.ultimaCarga=mesActual(); p.upd=Date.now();
   logAudit(`Cargado programado "${p.nombre}" (${eur(p.importe)} €)`);
   guardar();renderAvisosNuevo();renderProg();
   toast(`✓ "${p.nombre}" registrado: ${eur(p.importe)} €`);
@@ -1026,9 +1096,10 @@ function editProg(pid){
 function saveProg(pid){
   const p=programados.find(x=>x.id===pid);if(!p)return;
   p.nombre=document.getElementById('epN').value;p.cat=document.getElementById('epC').value;p.importe=parseFloat(document.getElementById('epI').value)||0;p.dia=parseInt(document.getElementById('epD').value)||1;p.frecuencia=document.getElementById('epF').value;p.pago=document.getElementById('epP').value;
+  p.upd=Date.now();
   guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado actualizado');
 }
-function delProg(pid){if(!confirm('¿Eliminar este gasto programado?'))return;programados=programados.filter(x=>x.id!==pid);guardar();renderProg();renderAvisosNuevo();toast('Programado eliminado');}
+function delProg(pid){if(!confirm('¿Eliminar este gasto programado?'))return;delProgIds.push({id:pid,t:Date.now()});programados=programados.filter(x=>x.id!==pid);guardar();renderProg();renderAvisosNuevo();toast('Programado eliminado');}
 function abrirModalProg(){
   const co=CATS.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
   document.getElementById('modalContainer').innerHTML=`<div class="modal-bg" id="mb" onclick="if(event.target.id==='mb')cerrar()"><div class="modal">
@@ -1047,7 +1118,7 @@ function abrirModalProg(){
 function saveNewProg(){
   const n=document.getElementById('npN').value.trim(),i=parseFloat(document.getElementById('npI').value)||0;
   if(!n||!i){alert('Rellena nombre e importe');return;}
-  programados.push({id:'p'+Date.now(),nombre:n,cat:document.getElementById('npC').value,importe:i,dia:parseInt(document.getElementById('npD').value)||1,frecuencia:document.getElementById('npF').value,pago:document.getElementById('npP').value,ultimaCarga:''});
+  programados.push({id:'p'+genId(),nombre:n,cat:document.getElementById('npC').value,importe:i,dia:parseInt(document.getElementById('npD').value)||1,frecuencia:document.getElementById('npF').value,pago:document.getElementById('npP').value,ultimaCarga:'',upd:Date.now()});
   guardar();cerrar();renderProg();renderAvisosNuevo();toast('Programado añadido');
 }
 
@@ -1081,7 +1152,7 @@ function guardarMov(){
   if(!prov||!imp||!fv){toast('Rellena fecha, proveedor e importe',true);return;}
   if(imp<=0){toast('El importe debe ser mayor que 0',true);return;}
   const p=fv.split('-');
-  movimientos.push({id:nextId++,fecha:`${parseInt(p[2])}/${parseInt(p[1])}/${p[0]}`,tipo,proveedor:prov,cat,desc,importe:imp,pago,factura:fac});
+  movimientos.push({id:genId(),fecha:`${parseInt(p[2])}/${parseInt(p[1])}/${p[0]}`,tipo,proveedor:prov,cat,desc,importe:imp,pago,factura:fac,upd:Date.now()});
   logAudit(`Nuevo ${tipo}: ${prov} (${eur(imp)} €)`);
   guardar();
   document.getElementById('nProv').value='';document.getElementById('nDesc').value='';document.getElementById('nImp').value='';
@@ -1123,8 +1194,8 @@ function editCat(tipo,nombre){
   const arr=tipo==='ingreso'?CATS_INGRESO:CATS_GASTO;
   const idx=arr.indexOf(nombre); if(idx<0)return;
   arr[idx]=n;
-  movimientos.forEach(m=>{if(m.cat===nombre)m.cat=n;});
-  programados.forEach(p=>{if(p.cat===nombre)p.cat=n;});
+  movimientos.forEach(m=>{if(m.cat===nombre){m.cat=n;m.upd=Date.now();}});
+  programados.forEach(p=>{if(p.cat===nombre){p.cat=n;p.upd=Date.now();}});
   recomputarCats();guardar();renderCats();toast('Categoría renombrada y registros actualizados');
 }
 function delCat(tipo,nombre){
@@ -1134,8 +1205,8 @@ function delCat(tipo,nombre){
   let destino=arr.find(c=>c!==nombre); // siempre una categoría existente del mismo tipo
   if(enUso>0){
     if(!confirm(`Hay ${enUso} registro(s) en "${nombre}". Si la borras, pasarán a "${destino}". ¿Continuar?`))return;
-    movimientos.forEach(m=>{if(m.cat===nombre)m.cat=destino;});
-    programados.forEach(p=>{if(p.cat===nombre)p.cat=destino;});
+    movimientos.forEach(m=>{if(m.cat===nombre){m.cat=destino;m.upd=Date.now();}});
+    programados.forEach(p=>{if(p.cat===nombre){p.cat=destino;p.upd=Date.now();}});
   } else {
     if(!confirm(`¿Borrar la categoría "${nombre}"?`))return;
   }
@@ -1217,7 +1288,7 @@ function procesarFilas(filas){
   if(descartadas)msg+=`\n• ${descartadas} fila(s) sin importe válido descartada(s).`;
   msg+='\n\n¿Continuar?';
   if(!confirm(msg))return;
-  nuevos.forEach(m=>m.id=nextId++);
+  nuevos.forEach(m=>{m.id=genId();m.upd=Date.now();});
   movimientos=movimientos.concat(nuevos);
   logAudit(`Importados ${nuevos.length} registros`);
   guardar();poblarFiltroCat();buildCharts();renderTabla();
@@ -1242,6 +1313,7 @@ function importarArchivo(ev){
 function resetDatos(){
   if(!confirm('¿Reiniciar a los datos originales? Se perderán los cambios (no afecta al PIN).'))return;
   movimientos=JSON.parse(JSON.stringify(ORIGINAL));programados=JSON.parse(JSON.stringify(PROG_ORIG));
+  const ahora=Date.now();movimientos.forEach(m=>m.upd=ahora);programados.forEach(p=>p.upd=ahora);
   CATS_GASTO=[...CATS_GASTO_DEF];CATS_INGRESO=[...CATS_INGRESO_DEF];recomputarCats();nextId=200;
   logAudit('Datos reiniciados a originales');
   guardar();poblarFiltroCat();buildCharts();renderTabla();renderProg();renderCats();renderAvisosNuevo();toast('Datos reiniciados');
@@ -1254,8 +1326,8 @@ function renderAudit(){
 async function arrancarApp(){
   if(window._arrancado)return; window._arrancado=true;
   initSB();
-  if(syncCode){ showOverlay('Descargando de la nube…'); try{await bajarNube();}catch(e){} hideOverlay(); }
-  else cargar();
+  cargar(); // siempre carga lo local primero
+  if(syncCode){ showOverlay('Sincronizando con la nube…'); try{ await mergeNube(); await subirNubeNow(); }catch(e){} hideOverlay(); }
   // estados de toggles
   document.getElementById('autoLock').checked=localStorage.getItem('marea_autolock')==='1';
   document.getElementById('notifPerm').checked=localStorage.getItem('marea_notif')==='1';

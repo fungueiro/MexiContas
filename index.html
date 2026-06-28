@@ -1002,7 +1002,7 @@ function editMov(id){
       <div class="form-group"><label>Pago</label><select id="ePago"><option${m.pago==='tarjeta'?' selected':''}>tarjeta</option><option${m.pago==='efectivo'?' selected':''}>efectivo</option><option${m.pago==='transferencia'?' selected':''}>transferencia</option></select></div>
       <div class="form-group"><label>¿Factura?</label><select id="eFac"><option${(m.factura||'no')==='no'?' selected':''}>no</option><option${m.factura==='si'?' selected':''}>si</option></select></div>
     </div>
-    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveMov(${id})"><i class="ti ti-check"></i> Guardar cambios</button></div>
+    <div class="btn-row" style="justify-content:space-between"><button class="btn" onclick="cerrar();copyMov(${id})"><i class="ti ti-copy"></i> Copiar como nuevo</button><span style="display:flex;gap:8px"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveMov(${id})"><i class="ti ti-check"></i> Guardar cambios</button></span></div>
   </div></div>`;
 }
 function saveMov(id){

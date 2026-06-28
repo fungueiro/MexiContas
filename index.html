@@ -962,14 +962,14 @@ function renderTabla(){
     <td><span class="badge bc" style="font-size:10px">${esc(m.cat)}</span></td>
     <td style="text-align:right;font-weight:600;${m.tipo==='Ingreso'?'color:var(--green-d)':''};white-space:nowrap">${m.tipo==='Gasto'?'-':''}${eur(m.importe)} €</td>
     <td style="color:var(--text2);font-size:11px">${esc(m.pago)}</td>
-    <td style="text-align:right;white-space:nowrap"><button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button> <button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></td>
+    <td style="text-align:right;white-space:nowrap"><button class="icon-btn" onclick="copyMov(${m.id})"><i class="ti ti-copy"></i> Copiar</button> <button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button> <button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></td>
   </tr>`).join('');
 
   document.getElementById('movCards').innerHTML=pageItems.map(m=>`<div class="mcard">
     <div class="mcard-top"><span class="mcard-prov">${esc(m.proveedor)}</span><span class="mcard-imp ${m.tipo==='Ingreso'?'green':'red'}">${m.tipo==='Gasto'?'-':''}${eur(m.importe)} €</span></div>
     <div class="mcard-meta"><span class="badge ${m.tipo==='Ingreso'?'bi':'bg'}">${m.tipo}</span><span class="badge bc">${esc(m.cat)}</span><span>${esc(m.fecha)}</span><span>· ${esc(m.pago)}</span></div>
     ${m.desc?`<div style="font-size:12px;color:var(--text2);margin-top:5px">${esc(m.desc)}</div>`:''}
-    <div class="mcard-actions"><button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button><button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></div>
+    <div class="mcard-actions"><button class="icon-btn" onclick="copyMov(${m.id})"><i class="ti ti-copy"></i> Copiar</button><button class="icon-btn" onclick="editMov(${m.id})"><i class="ti ti-edit"></i> Editar</button><button class="icon-btn btn-danger" onclick="delMov(${m.id})"><i class="ti ti-trash"></i> Borrar</button></div>
   </div>`).join('');
 
   document.getElementById('movPag').innerHTML = totPag>1 ?
@@ -1006,7 +1006,7 @@ function editMov(id){
       <div class="form-group"><label>Pago</label><select id="ePago"><option${m.pago==='tarjeta'?' selected':''}>tarjeta</option><option${m.pago==='efectivo'?' selected':''}>efectivo</option><option${m.pago==='transferencia'?' selected':''}>transferencia</option></select></div>
       <div class="form-group"><label>¿Factura?</label><select id="eFac"><option${(m.factura||'no')==='no'?' selected':''}>no</option><option${m.factura==='si'?' selected':''}>si</option></select></div>
     </div>
-    <div class="btn-row"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveMov(${id})"><i class="ti ti-check"></i> Guardar cambios</button></div>
+    <div class="btn-row" style="justify-content:space-between"><button class="btn" onclick="cerrar();copyMov(${id})"><i class="ti ti-copy"></i> Copiar como nuevo</button><span style="display:flex;gap:8px"><button class="btn" onclick="cerrar()">Cancelar</button><button class="btn btn-primary" onclick="saveMov(${id})"><i class="ti ti-check"></i> Guardar cambios</button></span></div>
   </div></div>`;
 }
 function saveMov(id){
@@ -1024,6 +1024,21 @@ function delMov(id){
   if(m)logAudit(`Eliminado movimiento #${id} (${m.proveedor}, ${eur(m.importe)} €)`);
   delMovIds.push({id,t:Date.now()});
   movimientos=movimientos.filter(x=>x.id!==id);guardar();renderTabla();toast('Registro eliminado');
+}
+function copyMov(id){
+  const m=movimientos.find(x=>x.id===id);if(!m)return;
+  activarSeccion('nuevo');
+  document.getElementById('nTipo').value=m.tipo;
+  poblarCat(document.getElementById('nCat'),m.tipo,m.cat);
+  document.getElementById('nProv').value=m.proveedor;
+  document.getElementById('nDesc').value=m.desc||'';
+  document.getElementById('nImp').value=m.importe;
+  document.getElementById('nPago').value=m.pago;
+  document.getElementById('nFac').value=m.factura||'no';
+  document.getElementById('nFecha').value=new Date().toISOString().split('T')[0];
+  const imp=document.getElementById('nImp');imp.focus();imp.select();
+  window.scrollTo({top:0,behavior:'smooth'});
+  toast('Datos copiados — revisa y pulsa Guardar');
 }
 function cerrar(){document.getElementById('modalContainer').innerHTML='';}
 

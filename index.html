@@ -136,6 +136,14 @@ button.icon-btn.btn-danger:hover{background:var(--red);color:#fff}
 .ac-list{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:2px;max-height:160px;overflow-y:auto;z-index:50;box-shadow:var(--shadow-lg);display:none}
 .ac-item{padding:7px 10px;font-size:15px;cursor:pointer}
 .ac-item:hover,.ac-item.sel{background:var(--surface2)}
+.catfilter-wrap{position:relative}
+.catfilter-panel{position:absolute;top:100%;left:0;margin-top:2px;background:var(--surface);border:1px solid var(--border);border-radius:8px;min-width:220px;max-height:260px;overflow-y:auto;z-index:50;box-shadow:var(--shadow-lg);display:none;padding:6px}
+.catfilter-panel.show{display:block}
+.catfilter-actions{display:flex;justify-content:space-between;gap:6px;padding:4px 6px 8px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.catfilter-link{background:none;border:none;color:var(--green-d);font-size:13px;font-weight:600;cursor:pointer;padding:0;font-family:inherit}
+.catfilter-item{display:flex;align-items:center;gap:8px;padding:6px 6px;font-size:14px;cursor:pointer;border-radius:6px}
+.catfilter-item:hover{background:var(--surface2)}
+.catfilter-item input{margin:0}
 /* ===== MÓVIL ===== */
 .mov-cards{display:none}
 .bottom-nav{display:none}
@@ -299,7 +307,10 @@ button.icon-btn.btn-danger:hover{background:var(--red);color:#fff}
 <div class="section" id="sec-movimientos">
   <div class="filters">
     <select id="fTipo"><option value="">Todos</option><option value="Ingreso">Ingresos</option><option value="Gasto">Gastos</option></select>
-    <select id="fCat"><option value="">Todas las categorías</option></select>
+    <div class="catfilter-wrap" id="fCatWrap">
+      <button type="button" class="btn" id="fCatBtn" onclick="toggleCatFilter(event)"><i class="ti ti-tag"></i> Todas las categorías <i class="ti ti-chevron-down"></i></button>
+      <div class="catfilter-panel" id="fCatPanel"></div>
+    </div>
     <span class="flabel">Desde</span><input type="date" id="fDesde">
     <span class="flabel">Hasta</span><input type="date" id="fHasta">
     <input type="text" id="fTxt" placeholder="Buscar proveedor, desc, categoría...">
@@ -581,6 +592,7 @@ let movimientos=[], programados=[], nextId=200, movFiltrados=[];
 let chMes,chCat,chBal;
 let sb=null, syncCode=null, syncing=false;
 let movPage=1; const PAGE_SIZE=50;
+let fCatSel=new Set();
 let auditoria=[];
 let delMovIds=[], delProgIds=[]; // papelera (tombstones) para propagar borrados al sincronizar
 
@@ -926,16 +938,45 @@ function poblarFiltroCat(){
   if(tipo==='Gasto')cats=CATS_GASTO.filter(c=>movimientos.some(m=>m.cat===c));
   else if(tipo==='Ingreso')cats=CATS_INGRESO.filter(c=>movimientos.some(m=>m.cat===c));
   else cats=[...new Set(movimientos.map(m=>m.cat))].sort();
-  const s=document.getElementById('fCat'), prev=s.value;
-  s.innerHTML='<option value="">Todas las categorías</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
-  if([...s.options].some(o=>o.value===prev))s.value=prev;else s.value='';
+  fCatSel=new Set([...fCatSel].filter(c=>cats.includes(c)));
+  const panel=document.getElementById('fCatPanel');
+  panel.innerHTML='<div class="catfilter-actions"><button type="button" class="catfilter-link" onclick="catFilterMarcarTodas()">Marcar todas</button><button type="button" class="catfilter-link" onclick="catFilterLimpiar()">Limpiar</button></div>'+
+    cats.map(c=>`<label class="catfilter-item"><input type="checkbox" value="${esc(c)}" ${fCatSel.has(c)?'checked':''} onchange="onCatCheck(this)"> ${esc(c)}</label>`).join('');
+  updateCatBtnLabel();
 }
+function updateCatBtnLabel(){
+  const btn=document.getElementById('fCatBtn');
+  if(fCatSel.size===0)btn.innerHTML='<i class="ti ti-tag"></i> Todas las categorías <i class="ti ti-chevron-down"></i>';
+  else if(fCatSel.size===1)btn.innerHTML=`<i class="ti ti-tag"></i> ${esc([...fCatSel][0])} <i class="ti ti-chevron-down"></i>`;
+  else btn.innerHTML=`<i class="ti ti-tag"></i> ${fCatSel.size} categorías <i class="ti ti-chevron-down"></i>`;
+}
+function onCatCheck(el){
+  if(el.checked)fCatSel.add(el.value);else fCatSel.delete(el.value);
+  updateCatBtnLabel();movPage=1;renderTabla();
+}
+function catFilterMarcarTodas(){
+  document.querySelectorAll('#fCatPanel input[type=checkbox]').forEach(c=>{c.checked=true;fCatSel.add(c.value);});
+  updateCatBtnLabel();movPage=1;renderTabla();
+}
+function catFilterLimpiar(){
+  fCatSel=new Set();
+  document.querySelectorAll('#fCatPanel input[type=checkbox]').forEach(c=>c.checked=false);
+  updateCatBtnLabel();movPage=1;renderTabla();
+}
+function toggleCatFilter(e){
+  e&&e.stopPropagation();
+  document.getElementById('fCatPanel').classList.toggle('show');
+}
+document.addEventListener('click',e=>{
+  const wrap=document.getElementById('fCatWrap');
+  if(wrap&&!wrap.contains(e.target))document.getElementById('fCatPanel').classList.remove('show');
+});
 function filtrarMov(){
-  const tipo=document.getElementById('fTipo').value, cat=document.getElementById('fCat').value, txt=document.getElementById('fTxt').value.toLowerCase();
+  const tipo=document.getElementById('fTipo').value, txt=document.getElementById('fTxt').value.toLowerCase();
   const d=document.getElementById('fDesde').value, h=document.getElementById('fHasta').value;
   return movimientos.filter(m=>{
     if(tipo&&m.tipo!==tipo)return false;
-    if(cat&&m.cat!==cat)return false;
+    if(fCatSel.size&&!fCatSel.has(m.cat))return false;
     const fe=toDate(m.fecha);
     if(d&&fe<new Date(d))return false;
     if(h&&fe>new Date(h+'T23:59:59'))return false;
@@ -979,11 +1020,12 @@ function renderTabla(){
   document.getElementById('movCount').innerHTML=`${f.length} movimientos · Ingresos: <span class="saldo-pos">${eur(totI)} €</span> · Gastos: <span class="saldo-neg">${eur(totG)} €</span> · Saldo: <span class="${saldo>=0?'saldo-pos':'saldo-neg'}">${saldo>=0?'+':''}${eur(saldo)} €</span>`;
 }
 function limpiarFiltros(){
-  ['fTipo','fCat','fDesde','fHasta','fTxt'].forEach(id=>document.getElementById(id).value='');
+  ['fTipo','fDesde','fHasta','fTxt'].forEach(id=>document.getElementById(id).value='');
+  fCatSel=new Set();
   poblarFiltroCat(); movPage=1; renderTabla(); toast('Filtro limpiado');
 }
 document.getElementById('fTipo').onchange=function(){poblarFiltroCat();movPage=1;renderTabla();};
-['fCat','fDesde','fHasta'].forEach(id=>document.getElementById(id).onchange=()=>{movPage=1;renderTabla();});
+['fDesde','fHasta'].forEach(id=>document.getElementById(id).onchange=()=>{movPage=1;renderTabla();});
 document.getElementById('fTxt').oninput=()=>{movPage=1;renderTabla();};
 
 /* ---------- EDITAR / BORRAR MOVIMIENTO ---------- */
